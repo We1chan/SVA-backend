@@ -478,8 +478,11 @@ public class DeploymentAnalyzerClient
 
         String zlmApp = StringUtils.isBlank(zlmServer.getApp()) ? DEFAULT_ZLM_APP : zlmServer.getApp().trim();
         String svaApp = StringUtils.isBlank(svaServer.getApp()) ? DEFAULT_SVA_APP : svaServer.getApp().trim();
+        Integer rtmpPort = zlmServer.getMedia_rtmp_port();
+        int effectiveRtmpPort = (rtmpPort != null && rtmpPort > 0) ? rtmpPort : 9995;
         return new BindingConfig(zlmServer.getHost().trim(), zlmApp, zlmServer.getMedia_rtsp_port(),
-            zlmServer.getMedia_http_port(), svaServer.getHost().trim(), svaApp, svaServer.getAnalyzer_port());
+            effectiveRtmpPort, zlmServer.getMedia_http_port(), svaServer.getHost().trim(), svaApp,
+            svaServer.getAnalyzer_port());
     }
 
     private String buildStreamUrl(BindingConfig config, String apeId)
@@ -497,7 +500,7 @@ public class DeploymentAnalyzerClient
         {
             return null;
         }
-        return "rtsp://" + config.zlmHost + ":" + config.zlmMediaRtspPort + "/" + config.svaApp + "/" + deploymentId;
+        return "rtmp://" + config.zlmHost + ":" + config.zlmMediaRtmpPort + "/" + config.svaApp + "/" + deploymentId;
     }
 
     private String buildAlgorithmStreamUrl(BindingConfig config, String deploymentId)
@@ -524,17 +527,19 @@ public class DeploymentAnalyzerClient
         private final String zlmHost;
         private final String zlmApp;
         private final int zlmMediaRtspPort;
+        private final int zlmMediaRtmpPort;
         private final int zlmMediaHttpPort;
         private final String svaHost;
         private final String svaApp;
         private final int svaAnalyzerPort;
 
-        private BindingConfig(String zlmHost, String zlmApp, int zlmMediaRtspPort, int zlmMediaHttpPort,
-            String svaHost, String svaApp, int svaAnalyzerPort)
+        private BindingConfig(String zlmHost, String zlmApp, int zlmMediaRtspPort, int zlmMediaRtmpPort,
+            int zlmMediaHttpPort, String svaHost, String svaApp, int svaAnalyzerPort)
         {
             this.zlmHost = zlmHost;
             this.zlmApp = zlmApp;
             this.zlmMediaRtspPort = zlmMediaRtspPort;
+            this.zlmMediaRtmpPort = zlmMediaRtmpPort;
             this.zlmMediaHttpPort = zlmMediaHttpPort;
             this.svaHost = svaHost;
             this.svaApp = svaApp;
