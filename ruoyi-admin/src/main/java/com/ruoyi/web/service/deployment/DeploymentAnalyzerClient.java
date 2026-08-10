@@ -255,6 +255,37 @@ public class DeploymentAnalyzerClient
         return postJson(bindingConfig.getAnalyzerBaseUrl() + "/api/control/cancel", payload, "cancel");
     }
 
+    public AnalyzerResult updateLiveOutput(DeploymentTask task, boolean videoEnabled,
+                                           boolean liveEventEnabled, float wsEventFps)
+    {
+        if (task == null || StringUtils.isEmpty(task.getDeploymentId()))
+        {
+            return AnalyzerResult.fail("布控任务不存在");
+        }
+        BindingConfig bindingConfig = resolveBinding(task.getDeviceId());
+        if (bindingConfig == null)
+        {
+            return AnalyzerResult.fail("未绑定可用服务器或配置缺失");
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("controlCode", task.getDeploymentId());
+        payload.put("videoEnabled", videoEnabled);
+        payload.put("liveEventEnabled", liveEventEnabled);
+        payload.put("wsEventFps", wsEventFps);
+        if (videoEnabled)
+        {
+            String pushStreamUrl = buildPushStreamUrl(bindingConfig, task.getDeploymentId());
+            if (StringUtils.isEmpty(pushStreamUrl))
+            {
+                return AnalyzerResult.fail("无法生成算法流推送地址");
+            }
+            payload.put("pushStreamUrl", pushStreamUrl);
+        }
+        return postJson(bindingConfig.getAnalyzerBaseUrl() + "/api/control/live-output",
+            payload, "live-output");
+    }
+
     public AnalyzerResult cancelControl(String deploymentId)
     {
         return AnalyzerResult.fail("缺少deviceId，无法定位绑定的SVA服务器");

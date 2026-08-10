@@ -348,6 +348,42 @@ public class DeploymentController
         return buildActionResult(true, "停止", analyzerResult.getMessage(), analyzerResult.getDetailMessage(), latest);
     }
 
+    @PostMapping("/{id}/live-output")
+    public AjaxResult updateLiveOutput(@PathVariable("id") String id,
+                                       @RequestBody LiveOutputRequest request)
+    {
+        DeploymentTask record = deploymentTaskService.selectDeploymentTaskById(id);
+        if (record == null)
+        {
+            return AjaxResult.error("布控任务不存在");
+        }
+        if (request == null)
+        {
+            return AjaxResult.error("请求参数不能为空");
+        }
+        float wsEventFps = request.getWsEventFps() == null ? 8.0F : request.getWsEventFps();
+        if (wsEventFps <= 0.0F || wsEventFps > 30.0F)
+        {
+            return AjaxResult.error("wsEventFps必须大于0且不超过30");
+        }
+        boolean videoEnabled = Boolean.TRUE.equals(request.getVideoEnabled());
+        boolean liveEventEnabled = Boolean.TRUE.equals(request.getLiveEventEnabled());
+        DeploymentAnalyzerClient.AnalyzerResult analyzerResult =
+            deploymentAnalyzerClient.updateLiveOutput(record, videoEnabled,
+                liveEventEnabled, wsEventFps);
+        if (!analyzerResult.isSuccess())
+        {
+            return AjaxResult.error(analyzerResult.getMessage());
+        }
+
+        AjaxResult result = AjaxResult.success(analyzerResult.getMessage());
+        result.put("videoEnabled", videoEnabled);
+        result.put("liveEventEnabled", liveEventEnabled);
+        result.put("algorithmStreamUrl", videoEnabled
+            ? deploymentAnalyzerClient.buildAlgorithmStreamUrl(record.getDeviceId(), id) : "");
+        return result;
+    }
+
     @GetMapping("/{id}")
     public AjaxResult get(@PathVariable("id") String id)
     {
@@ -1382,6 +1418,43 @@ public class DeploymentController
         List<DeploymentTaskEvent> list = new ArrayList<>(1);
         list.add(event);
         return list;
+    }
+
+    public static class LiveOutputRequest
+    {
+        private Boolean videoEnabled;
+        private Boolean liveEventEnabled;
+        private Float wsEventFps;
+
+        public Boolean getVideoEnabled()
+        {
+            return videoEnabled;
+        }
+
+        public void setVideoEnabled(Boolean videoEnabled)
+        {
+            this.videoEnabled = videoEnabled;
+        }
+
+        public Boolean getLiveEventEnabled()
+        {
+            return liveEventEnabled;
+        }
+
+        public void setLiveEventEnabled(Boolean liveEventEnabled)
+        {
+            this.liveEventEnabled = liveEventEnabled;
+        }
+
+        public Float getWsEventFps()
+        {
+            return wsEventFps;
+        }
+
+        public void setWsEventFps(Float wsEventFps)
+        {
+            this.wsEventFps = wsEventFps;
+        }
     }
 
     public static class CreateDeploymentRequest
