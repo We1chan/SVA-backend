@@ -26,10 +26,11 @@ foreach ($rule in $rules) {
     }
 
     if (Get-Command New-NetFirewallHyperVRule -ErrorAction SilentlyContinue) {
-        if (-not (Get-NetFirewallHyperVRule -Name $rule.Name -PolicyStore ActiveStore -ErrorAction SilentlyContinue)) {
+        $hyperVRuleName = "$($rule.Name)-HyperV"
+        if (-not (Get-NetFirewallHyperVRule -Name $hyperVRuleName -PolicyStore ActiveStore -ErrorAction SilentlyContinue)) {
             New-NetFirewallHyperVRule `
-                -Name $rule.Name `
-                -DisplayName $rule.Display `
+                -Name $hyperVRuleName `
+                -DisplayName "$($rule.Display) (WSL Hyper-V)" `
                 -PolicyStore ActiveStore `
                 -VMCreatorId $vmCreatorId `
                 -Direction Inbound `
