@@ -13,6 +13,7 @@
         <result property="gb_channel_id" column="gb_channel_id"/>
         <result property="gb_media_server_id" column="gb_media_server_id"/>
         <result property="gb_stream_id" column="gb_stream_id"/>
+        <result property="gb_stream_url" column="gb_stream_url"/>
         <result property="gb_last_sync_time" column="gb_last_sync_time"/>
         <result property="resource_type" column="resource_type"/>
         <result property="sub_type" column="sub_type"/>
@@ -45,6 +46,7 @@
             gb_channel_id,
             gb_media_server_id,
             gb_stream_id,
+            gb_stream_url,
             gb_last_sync_time,
             resource_type,
             sub_type,
@@ -69,9 +71,9 @@
 
     <insert id="insertDevice">
         INSERT INTO h_device
-        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, gb_device_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_last_sync_time, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
+        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, gb_device_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_stream_url, gb_last_sync_time, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
         VALUES
-            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_last_sync_time}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
+            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_stream_url}, #{gb_last_sync_time}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
     </insert>
 
     <delete id="deleteDevice">
@@ -85,9 +87,9 @@
 
     <insert id="insertDeviceCrud" parameterType="HDevice">
         INSERT INTO h_device
-        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, gb_device_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_last_sync_time, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
+        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, gb_device_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_stream_url, gb_last_sync_time, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
         VALUES
-            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_last_sync_time}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
+            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_stream_url}, #{gb_last_sync_time}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
     </insert>
 
     <update id="updateDevice" parameterType="HDevice">
@@ -102,6 +104,7 @@
             <if test="gb_channel_id != null">gb_channel_id = #{gb_channel_id},</if>
             <if test="gb_media_server_id != null">gb_media_server_id = #{gb_media_server_id},</if>
             <if test="gb_stream_id != null">gb_stream_id = #{gb_stream_id},</if>
+            <if test="gb_stream_url != null">gb_stream_url = #{gb_stream_url},</if>
             <if test="gb_last_sync_time != null">gb_last_sync_time = #{gb_last_sync_time},</if>
             <if test="resource_type != null">resource_type = #{resource_type},</if>
             <if test="sub_type != null">sub_type = #{sub_type},</if>
@@ -193,6 +196,27 @@
             parent_code = VALUES(parent_code),
             update_time = VALUES(update_time)
     </insert>
+
+    <update id="updateGb28181Playback">
+        UPDATE h_device
+        SET play_url = #{playUrl},
+            gb_stream_id = #{streamId},
+            gb_stream_url = #{streamUrl},
+            gb_media_server_id = #{mediaServerId},
+            update_time = DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s')
+        WHERE ape_id = #{apeId}
+          AND stream_source_type = 'GB28181'
+    </update>
+
+    <update id="clearGb28181Playback">
+        UPDATE h_device
+        SET play_url = NULL,
+            gb_stream_id = NULL,
+            gb_stream_url = NULL,
+            update_time = DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s')
+        WHERE ape_id = #{apeId}
+          AND stream_source_type = 'GB28181'
+    </update>
 
     <delete id="deleteDeviceByApeIds">
         DELETE FROM h_device

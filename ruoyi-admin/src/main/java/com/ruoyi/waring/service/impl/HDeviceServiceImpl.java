@@ -12,10 +12,12 @@ import com.ruoyi.common.core.page.TableSupport;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.mapper.SysDeptMapper;
 import com.ruoyi.system.mapper.SysUserMapper;
+import com.ruoyi.waring.domain.Gb28181PlaybackInfo;
 import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.domain.ZlmServer;
 import com.ruoyi.waring.mapper.HDeviceMapper;
 import com.ruoyi.waring.mapper.ZlmServerMapper;
+import com.ruoyi.waring.service.Gb28181PlaybackService;
 import com.ruoyi.waring.service.HDeviceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +67,9 @@ public class HDeviceServiceImpl implements HDeviceService {
 
     @Autowired
     ZlmServerMapper zlmServerMapper;
+
+    @Autowired
+    private Gb28181PlaybackService gb28181PlaybackService;
 
     @Autowired(required = false)
     private RestTemplate restTemplate;
@@ -460,9 +465,29 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("设备不存在: " + apeId);
         }
 
-        String startAddProxyUrl = buildDirectAddProxyUrl(existedDevice);
         String startPlayUrl = buildDirectPlayUrl(existedDevice);
-        if (isDirectDevice(existedDevice)) {
+        boolean gbPlaybackStarted = false;
+        if (isGb28181Device(existedDevice)) {
+            if (!"1".equals(existedDevice.getIs_online())) {
+                throw new ServiceException("GB28181 设备当前离线，无法点播");
+            }
+            Gb28181PlaybackInfo playbackInfo = gb28181PlaybackService.start(
+                    existedDevice.getGb_device_id(), existedDevice.getGb_channel_id());
+            gbPlaybackStarted = true;
+            startPlayUrl = playbackInfo.getPlayUrl();
+            String mediaServerId = StringUtils.isBlank(playbackInfo.getMediaServerId())
+                    ? existedDevice.getGb_media_server_id() : playbackInfo.getMediaServerId();
+            try {
+                int playbackUpdated = hDeviceMapper.updateGb28181Playback(apeId, playbackInfo.getPlayUrl(),
+                        playbackInfo.getStreamId(), playbackInfo.getRtspUrl(), mediaServerId);
+                if (playbackUpdated <= 0) {
+                    throw new ServiceException("保存 GB28181 点播地址失败: " + apeId);
+                }
+            } catch (RuntimeException ex) {
+                stopGb28181PlaybackQuietly(existedDevice, "保存点播地址失败后回收 WVP 会话");
+                throw ex;
+            }
+        } else if (isDirectDevice(existedDevice)) {
             Map<String, Object> directLiveInfo = getDirectLiveUrl(apeId);
             boolean addProxyAlreadyExists = Boolean.TRUE.equals(directLiveInfo.get("addProxyAlreadyExists"));
             if (addProxyAlreadyExists) {
@@ -481,8 +506,21 @@ public class HDeviceServiceImpl implements HDeviceService {
             }
         }
 
-        int updated = hDeviceMapper.updateMonitorStateByApeId(apeId, MONITOR_STATUS_RUNNING);
+        int updated;
+        try {
+            updated = hDeviceMapper.updateMonitorStateByApeId(apeId, MONITOR_STATUS_RUNNING);
+        } catch (RuntimeException ex) {
+            if (gbPlaybackStarted) {
+                stopGb28181PlaybackQuietly(existedDevice, "更新监控状态异常后回收 WVP 会话");
+                clearGb28181PlaybackQuietly(apeId, "更新监控状态异常后清理点播地址");
+            }
+            throw ex;
+        }
         if (updated <= 0) {
+            if (gbPlaybackStarted) {
+                stopGb28181PlaybackQuietly(existedDevice, "更新监控状态失败后回收 WVP 会话");
+                clearGb28181PlaybackQuietly(apeId, "更新监控状态失败后清理点播地址");
+            }
             throw new ServiceException("启动监控失败: " + apeId);
         }
         return updated;
@@ -500,7 +538,13 @@ public class HDeviceServiceImpl implements HDeviceService {
         }
 
         boolean directProxyDeleted = false;
-        if (isDirectDevice(existedDevice) && StringUtils.isNotBlank(existedDevice.getZlm_proxy_key())) {
+        if (isGb28181Device(existedDevice)) {
+            try {
+                gb28181PlaybackService.stop(existedDevice.getGb_device_id(), existedDevice.getGb_channel_id());
+            } catch (Exception e) {
+                log.warn("停止 WVP 国标点播失败，继续清理平台状态, apeId={}, message={}", apeId, e.getMessage());
+            }
+        } else if (isDirectDevice(existedDevice) && StringUtils.isNotBlank(existedDevice.getZlm_proxy_key())) {
             try {
                 directProxyDeleted = deleteDirectStreamProxy(existedDevice);
             } catch (Exception e) {
@@ -513,7 +557,11 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("停止监控失败: " + apeId);
         }
 
-        hDeviceMapper.updatePlayUrlByApeId(apeId, null);
+        if (isGb28181Device(existedDevice)) {
+            hDeviceMapper.clearGb28181Playback(apeId);
+        } else {
+            hDeviceMapper.updatePlayUrlByApeId(apeId, null);
+        }
         if (directProxyDeleted) {
             hDeviceMapper.updateZlmProxyKeyByApeId(apeId, null);
         }
@@ -531,13 +579,23 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("设备不存在: " + apeId);
         }
 
-        String previewAddProxyUrl = buildDirectAddProxyUrl(device);
-        String previewPlayUrl = device.getPlay_url();
-        if (StringUtils.isBlank(previewPlayUrl)) {
-            previewPlayUrl = buildDirectPlayUrl(device);
-        }
-        if (StringUtils.isBlank(previewPlayUrl)) {
-            previewPlayUrl = device.getDirect_source_url();
+        String previewPlayUrl;
+        if (isGb28181Device(device)) {
+            if (!"1".equals(device.getIs_online())) {
+                throw new ServiceException("GB28181 设备当前离线，无法预览");
+            }
+            previewPlayUrl = device.getPlay_url();
+            if (StringUtils.isBlank(previewPlayUrl)) {
+                throw new ServiceException("GB28181 设备尚未启动点播，请先启动监控");
+            }
+        } else {
+            previewPlayUrl = device.getPlay_url();
+            if (StringUtils.isBlank(previewPlayUrl)) {
+                previewPlayUrl = buildDirectPlayUrl(device);
+            }
+            if (StringUtils.isBlank(previewPlayUrl)) {
+                previewPlayUrl = device.getDirect_source_url();
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -547,6 +605,12 @@ public class HDeviceServiceImpl implements HDeviceService {
         result.put("monitorStatus", device.getMonitor_status());
         result.put("directSourceUrl", device.getDirect_source_url());
         result.put("playUrl", previewPlayUrl);
+        result.put("rtspUrl", device.getGb_stream_url());
+        result.put("streamUrl", device.getGb_stream_url());
+        result.put("gbDeviceId", device.getGb_device_id());
+        result.put("gbChannelId", device.getGb_channel_id());
+        result.put("gbStreamId", device.getGb_stream_id());
+        result.put("gbMediaServerId", device.getGb_media_server_id());
         result.put("ipAddr", device.getIp_addr());
         result.put("port", device.getPort());
         result.put("supportedMonitorStatuses", new String[] {
@@ -561,6 +625,27 @@ public class HDeviceServiceImpl implements HDeviceService {
 
     private boolean isDirectDevice(HDevice device) {
         return device != null && STREAM_SOURCE_TYPE_DIRECT.equalsIgnoreCase(device.getStream_source_type());
+    }
+
+    private boolean isGb28181Device(HDevice device) {
+        return device != null && STREAM_SOURCE_TYPE_GB28181.equalsIgnoreCase(device.getStream_source_type());
+    }
+
+    private void stopGb28181PlaybackQuietly(HDevice device, String reason) {
+        try {
+            gb28181PlaybackService.stop(device.getGb_device_id(), device.getGb_channel_id());
+        } catch (Exception stopException) {
+            log.warn("{}, deviceId={}, channelId={}, message={}", reason,
+                    device.getGb_device_id(), device.getGb_channel_id(), stopException.getMessage());
+        }
+    }
+
+    private void clearGb28181PlaybackQuietly(String apeId, String reason) {
+        try {
+            hDeviceMapper.clearGb28181Playback(apeId);
+        } catch (Exception clearException) {
+            log.warn("{}, apeId={}, message={}", reason, apeId, clearException.getMessage());
+        }
     }
 
     private String normalizeOrgIndex(String orgIndex) {
@@ -592,34 +677,6 @@ public class HDeviceServiceImpl implements HDeviceService {
             return "cam" + System.currentTimeMillis();
         }
         return stream;
-    }
-
-    private String buildDirectAddProxyUrl(HDevice device) {
-        if (device == null || !STREAM_SOURCE_TYPE_DIRECT.equalsIgnoreCase(device.getStream_source_type())
-            || StringUtils.isBlank(device.getDirect_source_url())) {
-            return "";
-        }
-
-        ZlmServer zlmServer = resolveEnabledZlmServer(device);
-        if (zlmServer == null || StringUtils.isBlank(zlmServer.getHost()) || zlmServer.getApi_port() == null) {
-            return "";
-        }
-
-        String zlmApp = StringUtils.isBlank(zlmServer.getApp()) ? DEFAULT_ZLM_APP : zlmServer.getApp().trim();
-        String stream = sanitizeStreamName(device.getApe_id());
-        return UriComponentsBuilder
-            .fromUriString("http://" + zlmServer.getHost() + ":" + zlmServer.getApi_port() + "/index/api/addStreamProxy")
-            .queryParam("vhost", "__defaultVhost__")
-            .queryParam("app", zlmApp)
-            .queryParam("stream", stream)
-            .queryParam("url", device.getDirect_source_url())
-            .queryParam("enable_mp4", 1)
-            .queryParam("auto_close", 0)
-            .queryParamIfPresent("secret", StringUtils.isNotBlank(zlmServer.getSecret())
-                ? java.util.Optional.of(zlmServer.getSecret())
-                : java.util.Optional.empty())
-            .build(true)
-            .toUriString();
     }
 
     private String buildDirectPlayUrl(HDevice device) {

@@ -31,6 +31,8 @@ gb28181:
   default-org-name: ${GB28181_DEFAULT_ORG_NAME:研发部门}
   sync-initial-delay-ms: ${GB28181_SYNC_INITIAL_DELAY_MS:30000}
   sync-fixed-delay-ms: ${GB28181_SYNC_FIXED_DELAY_MS:15000}
+  # Must exceed WVP's 18-second timeout and remain below the browser's 23 seconds.
+  play-timeout-ms: ${GB28181_PLAY_TIMEOUT_MS:20000}
 
 # 开发环境配置
 server:
