@@ -6,6 +6,7 @@ import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.waring.domain.HDevice;
+import com.ruoyi.waring.service.Gb28181SyncService;
 import com.ruoyi.waring.service.HDeviceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -32,6 +33,9 @@ public class HDeviceController extends BaseController {
 
     @Autowired
     private HDeviceService hDeviceService;
+
+    @Autowired
+    private Gb28181SyncService gb28181SyncService;
 
     @Resource
     private RedisTemplate<Object, Object> redisTemplate;
@@ -92,6 +96,15 @@ public class HDeviceController extends BaseController {
     @PostMapping
     public AjaxResult add(@RequestBody HDevice device) {
         return toAjax(hDeviceService.insertDeviceCrud(device));
+    }
+
+    /**
+     * 从 WVP 同步国标设备、通道与在线状态
+     */
+    @PreAuthorize("@ss.hasPermi('waring:device:edit')")
+    @PostMapping("/gb28181/sync")
+    public AjaxResult syncGb28181Devices() {
+        return success(gb28181SyncService.syncDevices());
     }
 
     /**

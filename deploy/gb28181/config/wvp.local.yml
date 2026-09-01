@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: easysva-wvp
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    async:
+      request-timeout: 20000
+  cache:
+    type: redis
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 7
+      timeout: 10000
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3307/wvp?useUnicode=true&characterEncoding=UTF8&rewriteBatchedStatements=true&serverTimezone=Asia/Shanghai&useSSL=false&allowMultiQueries=true&allowPublicKeyRetrieval=true
+    username: ${WVP_DB_USERNAME:wvp}
+    password: ${WVP_DB_PASSWORD:easySVA.GB28181}
+
+server:
+  port: 18080
+
+sip:
+  ip: ${GB28181_HOST_IP}
+  show-ip: ${GB28181_HOST_IP}
+  port: 5060
+  domain: 4401020049
+  id: 44010200492000000001
+  password: ${GB28181_SIP_PASSWORD:admin123}
+  register-time-interval: 60
+  alarm: false
+  timeout: 2000
+
+media:
+  id: easysva-gb28181
+  ip: 127.0.0.1
+  stream-ip: ${GB28181_HOST_IP}
+  sdp-ip: ${GB28181_HOST_IP}
+  hook-ip: 127.0.0.1
+  http-port: 9996
+  auto-config: true
+  secret: ${GB28181_ZLM_SECRET:easySVA.GB28181.ZLM}
+  rtp:
+    enable: true
+    port-range: 40002,45000
+    send-port-range: 50000,55000
+  record-path: /var/www/SVA-web/upload/gb28181
+  record-day: 7
+  record-assist-port: 0
+
+user-settings:
+  server-id: easysva-local
+  jwk-file: /opt/easySVA/wvp/jwk.json
+  auto-apply-play: true
+  # Keep this below the easySVA browser request timeout (23 seconds).
+  play-timeout: 18000
+  wait-track: false
+  record-push-live: false
+  record-sip: false
+  stream-on-demand: true
+  interface-authentication: false
+  push-authority: false
+  sync-channel-on-device-online: true
+  use-pushing-as-status: true
+  sip-log: true
+  sql-log: false
+  allowed-origins:
+    - http://localhost:8080
+    - http://127.0.0.1:8080
+
+logging:
+  config: classpath:logback-spring.xml

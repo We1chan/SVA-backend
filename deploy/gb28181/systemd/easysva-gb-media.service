@@ -1,0 +1,17 @@
+[Unit]
+Description=easySVA GB28181 ZLMediaKit
+After=network.target
+RequiresMountsFor=/mnt/d/Codex/easySVA
+
+[Service]
+Type=simple
+Environment=EASYSVA_HOME=/mnt/d/Codex/easySVA
+WorkingDirectory=/mnt/d/Codex/easySVA/SVA-mediaServer/release/linux/Release
+ExecStart=/bin/bash -lc 'exec "$EASYSVA_HOME/SVA-mediaServer/release/linux/Release/MediaServer" -c "$EASYSVA_HOME/SVA-backend/deploy/gb28181/config/zlm-gb.local.ini"'
+Restart=on-failure
+RestartSec=3
+StandardOutput=append:/opt/easySVA/logs/gb-media.log
+StandardError=append:/opt/easySVA/logs/gb-media.log
+
+[Install]
+WantedBy=multi-user.target

@@ -22,6 +22,18 @@ h3:
 hy:
   opc-address: opc.tcp://127.0.0.1:49310
 
+# GB28181 device synchronization (WVP handles SIP, ZLMediaKit handles media)
+gb28181:
+  enabled: ${GB28181_ENABLED:true}
+  wvp-base-url: ${GB28181_WVP_BASE_URL:http://127.0.0.1:18080}
+  media-server-id: ${GB28181_MEDIA_SERVER_ID:easysva-gb28181}
+  default-org-index: ${GB28181_DEFAULT_ORG_INDEX:103}
+  default-org-name: ${GB28181_DEFAULT_ORG_NAME:研发部门}
+  sync-initial-delay-ms: ${GB28181_SYNC_INITIAL_DELAY_MS:30000}
+  sync-fixed-delay-ms: ${GB28181_SYNC_FIXED_DELAY_MS:15000}
+  # Must exceed WVP's 18-second timeout and remain below the browser's 23 seconds.
+  play-timeout-ms: ${GB28181_PLAY_TIMEOUT_MS:20000}
+
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080
