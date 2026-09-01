@@ -42,6 +42,7 @@ public class HDeviceServiceImpl implements HDeviceService {
 
     private static final String STREAM_SOURCE_TYPE_DIRECT = "DIRECT";
     private static final String STREAM_SOURCE_TYPE_PLATFORM = "PLATFORM";
+    private static final String STREAM_SOURCE_TYPE_GB28181 = "GB28181";
     private static final int MAX_APE_ID_GENERATE_RETRY = 20;
     private static final Pattern STREAM_NAME_PATTERN = Pattern.compile("[^A-Za-z0-9_-]");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -136,13 +137,26 @@ public class HDeviceServiceImpl implements HDeviceService {
         }
 
         streamSourceType = StringUtils.upperCase(streamSourceType.trim());
-        if (!STREAM_SOURCE_TYPE_DIRECT.equals(streamSourceType) && !STREAM_SOURCE_TYPE_PLATFORM.equals(streamSourceType)) {
-            throw new ServiceException("stream_source_type 仅支持 PLATFORM 或 DIRECT");
+        if (!STREAM_SOURCE_TYPE_DIRECT.equals(streamSourceType)
+                && !STREAM_SOURCE_TYPE_PLATFORM.equals(streamSourceType)
+                && !STREAM_SOURCE_TYPE_GB28181.equals(streamSourceType)) {
+            throw new ServiceException("stream_source_type 仅支持 DIRECT、PLATFORM 或 GB28181");
         }
         device.setStream_source_type(streamSourceType);
     }
 
     private void validateStreamSourceRule(HDevice device, HDevice existedDevice) {
+        if (STREAM_SOURCE_TYPE_GB28181.equals(device.getStream_source_type())) {
+            String finalGbDeviceId = pickFinalValue(device.getGb_device_id(),
+                    existedDevice == null ? null : existedDevice.getGb_device_id());
+            String finalGbChannelId = pickFinalValue(device.getGb_channel_id(),
+                    existedDevice == null ? null : existedDevice.getGb_channel_id());
+            if (StringUtils.isBlank(finalGbDeviceId) || StringUtils.isBlank(finalGbChannelId)) {
+                throw new ServiceException("GB28181 设备类型下，gb_device_id 和 gb_channel_id 不能为空");
+            }
+            return;
+        }
+
         if (!STREAM_SOURCE_TYPE_DIRECT.equals(device.getStream_source_type())) {
             return;
         }
