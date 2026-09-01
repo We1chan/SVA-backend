@@ -1,0 +1,18 @@
+[Unit]
+Description=easySVA GB28181 WVP Signaling Platform
+After=network-online.target mysql.service redis-server.service easysva-gb-media.service
+Wants=network-online.target mysql.service redis-server.service
+Requires=easysva-gb-media.service
+RequiresMountsFor=/mnt/d/Codex/easySVA
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/d/Codex/easySVA/wvp-GB28181-pro
+ExecStart=/bin/bash /mnt/d/Codex/easySVA/SVA-backend/deploy/gb28181/scripts/wvp-start.sh
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/easySVA/logs/wvp.log
+StandardError=append:/opt/easySVA/logs/wvp.log
+
+[Install]
+WantedBy=multi-user.target
