@@ -56,7 +56,7 @@ bash deploy/gb28181/scripts/regression.sh
 本仓库已完成平台侧的 WVP、ZLMediaKit 和 easySVA 同步逻辑；真正完成设备接入仍需要一台支持 GB28181 的 IPC 与本机处于同一局域网。
 
 1. 先运行 `bash deploy/gb28181/scripts/health.sh`。其中 `WVP HTTP`、`SIP TCP`、`SIP UDP`、`GB ZLM HTTP` 和 `GB ZLM RTSP` 必须均为 `OK`。
-2. 以管理员身份运行 `open-firewall.ps1`，允许局域网访问 SIP 和 RTP 端口：
+2. 以管理员身份运行 `open-firewall.ps1`，允许局域网访问 SIP、WebSocket 预览、RTSP 和 RTP 端口：
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File deploy\gb28181\scripts\open-firewall.ps1
