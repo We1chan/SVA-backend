@@ -33,6 +33,12 @@ public interface HDeviceMapper {
     int updateZlmProxyKeyByApeId(@Param("apeId") String apeId,
                                  @Param("zlmProxyKey") String zlmProxyKey);
 
+    int markAllGb28181DevicesOffline();
+
+    int clearOfflineGb28181Playback();
+
+    int upsertGb28181Device(HDevice device);
+
     List<HDevice> selectDeviceList(HDevice device);
 
     List<HDevice> selectLDeviceList(HDevice device);
