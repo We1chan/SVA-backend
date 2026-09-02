@@ -179,6 +179,15 @@
         WHERE device_type = 'GB28181' AND zlm_server_id = #{zlmServerId}
     </update>
 
+    <update id="updateGbDeviceOnlineByChannel">
+        UPDATE h_device
+        SET is_online = #{isOnline}, update_time = NOW()
+        WHERE zlm_server_id = #{zlmServerId}
+          AND gb_device_id = #{gbDeviceId}
+          AND gb_channel_id = #{gbChannelId}
+          AND device_type = 'GB28181'
+    </update>
+
     <delete id="deleteDeviceByApeIds">
         DELETE FROM h_device
         WHERE ape_id IN

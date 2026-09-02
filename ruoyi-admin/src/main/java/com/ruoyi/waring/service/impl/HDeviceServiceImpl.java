@@ -12,15 +12,18 @@ import com.ruoyi.common.core.page.TableSupport;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.mapper.SysDeptMapper;
 import com.ruoyi.system.mapper.SysUserMapper;
+import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.domain.ZlmServer;
 import com.ruoyi.waring.mapper.HDeviceMapper;
 import com.ruoyi.waring.mapper.ZlmServerMapper;
+import com.ruoyi.waring.service.Gb28181DeviceSyncService;
 import com.ruoyi.waring.service.HDeviceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.stereotype.Component;
@@ -52,6 +55,8 @@ public class HDeviceServiceImpl implements HDeviceService {
     private static final String MONITOR_STATUS_ERROR = "ERROR";
     private static final long DEFAULT_SERVER_ID = 1L;
     private static final String DEFAULT_ZLM_APP = "live";
+    private static final String DEVICE_TYPE_GB28181 = "GB28181";
+    private static final String DEVICE_STATE_ONLINE = "1";
 
     @Autowired
     HDeviceMapper hDeviceMapper;
@@ -67,6 +72,9 @@ public class HDeviceServiceImpl implements HDeviceService {
 
     @Autowired(required = false)
     private RestTemplate restTemplate;
+
+    @Autowired(required = false)
+    private Gb28181DeviceSyncService gb28181DeviceSyncService;
 
     @PostConstruct
     private void initRestTemplate() {
@@ -446,6 +454,20 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("设备不存在: " + apeId);
         }
 
+        if (isGb28181Device(existedDevice)) {
+            if (!DEVICE_STATE_ONLINE.equals(existedDevice.getIs_online())) {
+                throw new ServiceException("国标设备当前离线，无法启动监控");
+            }
+            if (StringUtils.isBlank(existedDevice.getPlay_url())) {
+                throw new ServiceException("国标设备暂无可用播放地址，请先执行目录同步");
+            }
+            int gbUpdated = hDeviceMapper.updateMonitorStateByApeId(apeId, MONITOR_STATUS_RUNNING);
+            if (gbUpdated <= 0) {
+                throw new ServiceException("启动监控失败: " + apeId);
+            }
+            return gbUpdated;
+        }
+
         String startAddProxyUrl = buildDirectAddProxyUrl(existedDevice);
         String startPlayUrl = buildDirectPlayUrl(existedDevice);
         if (isDirectDevice(existedDevice)) {
@@ -485,6 +507,14 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("设备不存在: " + apeId);
         }
 
+        if (isGb28181Device(existedDevice)) {
+            int gbUpdated = hDeviceMapper.updateMonitorStateByApeId(apeId, MONITOR_STATUS_STOPPED);
+            if (gbUpdated <= 0) {
+                throw new ServiceException("停止监控失败: " + apeId);
+            }
+            return gbUpdated;
+        }
+
         boolean directProxyDeleted = false;
         if (isDirectDevice(existedDevice) && StringUtils.isNotBlank(existedDevice.getZlm_proxy_key())) {
             try {
@@ -515,6 +545,15 @@ public class HDeviceServiceImpl implements HDeviceService {
         HDevice device = hDeviceMapper.selectDeviceByApeId(apeId);
         if (device == null) {
             throw new ServiceException("设备不存在: " + apeId);
+        }
+
+        if (isGb28181Device(device)) {
+            if (!DEVICE_STATE_ONLINE.equals(device.getIs_online())) {
+                throw new ServiceException("国标设备当前离线，无法预览");
+            }
+            if (StringUtils.isBlank(device.getPlay_url())) {
+                throw new ServiceException("国标设备暂无可用播放地址，请先执行目录同步");
+            }
         }
 
         String previewPlayUrl = device.getPlay_url();
@@ -552,6 +591,62 @@ public class HDeviceServiceImpl implements HDeviceService {
 
     private boolean isDirectDevice(HDevice device) {
         return device != null && STREAM_SOURCE_TYPE_DIRECT.equalsIgnoreCase(device.getStream_source_type());
+    }
+
+    private boolean isGb28181Device(HDevice device) {
+        return device != null && DEVICE_TYPE_GB28181.equalsIgnoreCase(device.getDevice_type());
+    }
+
+    @Override
+    public Map<String, Object> syncGb28181Catalog(Long zlmServerId, List<Gb28181Channel> channels) {
+        if (gb28181DeviceSyncService == null) {
+            throw new ServiceException("国标设备同步服务不可用");
+        }
+        Gb28181DeviceSyncService.DeviceSyncResult result =
+            gb28181DeviceSyncService.syncDevices(zlmServerId, channels);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("created", result.getCreated());
+        payload.put("updated", result.getUpdated());
+        payload.put("offlineMarked", result.getOfflineMarked());
+        return payload;
+    }
+
+    @Override
+    public Map<String, Object> refreshGb28181Status(Long zlmServerId) {
+        if (gb28181DeviceSyncService == null) {
+            throw new ServiceException("国标设备刷新服务不可用");
+        }
+        Gb28181DeviceSyncService.MediaRefreshResult result =
+            gb28181DeviceSyncService.refreshMediaFromZlm(zlmServerId);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("available", result.getAvailable());
+        payload.put("unavailable", result.getUnavailable());
+        return payload;
+    }
+
+    /**
+     * Periodically refresh GB28181 media availability from every enabled ZLM node.
+     * Failures are logged only and never flip RTSP devices offline.
+     */
+    @Scheduled(fixedDelayString = "${easysva.gb28181.status-refresh-ms:60000}")
+    public void scheduledGb28181StatusRefresh() {
+        if (gb28181DeviceSyncService == null || zlmServerMapper == null) {
+            return;
+        }
+        List<ZlmServer> servers = zlmServerMapper.selectEnabledList();
+        if (servers == null) {
+            return;
+        }
+        for (ZlmServer server : servers) {
+            if (server == null || server.getId() == null) {
+                continue;
+            }
+            try {
+                gb28181DeviceSyncService.refreshMediaFromZlm(server.getId());
+            } catch (Exception ex) {
+                log.error("GB28181 状态定时刷新失败, zlmServerId={}", server.getId(), ex);
+            }
+        }
     }
 
     private String normalizeOrgIndex(String orgIndex) {

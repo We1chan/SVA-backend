@@ -6,8 +6,10 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.domain.Gb28181MediaStream;
+import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.domain.ZlmServer;
 import com.ruoyi.waring.mapper.Gb28181CatalogMapper;
+import com.ruoyi.waring.mapper.HDeviceMapper;
 import com.ruoyi.waring.mapper.ZlmServerMapper;
 import com.ruoyi.waring.service.Gb28181DeviceSyncService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,19 +27,24 @@ import java.util.stream.Collectors;
 @Service
 public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String GB_DEVICE_TYPE = "GB28181";
+    private static final String ONLINE = "1";
+    private static final String OFFLINE = "2";
     private final Gb28181CatalogMapper catalogMapper;
     private final ZlmServerMapper zlmServerMapper;
+    private final HDeviceMapper hDeviceMapper;
     private final RestTemplate restTemplate;
 
     public Gb28181DeviceSyncServiceImpl(Gb28181CatalogMapper catalogMapper) {
-        this(catalogMapper, null, new RestTemplate());
+        this(catalogMapper, null, null, new RestTemplate());
     }
 
     @Autowired
     public Gb28181DeviceSyncServiceImpl(Gb28181CatalogMapper catalogMapper, ZlmServerMapper zlmServerMapper,
-                                        RestTemplate restTemplate) {
+                                        HDeviceMapper hDeviceMapper, RestTemplate restTemplate) {
         this.catalogMapper = catalogMapper;
         this.zlmServerMapper = zlmServerMapper;
+        this.hDeviceMapper = hDeviceMapper;
         this.restTemplate = restTemplate == null ? new RestTemplate() : restTemplate;
     }
 
@@ -48,6 +55,71 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
             validateCatalogChannel(channel);
             catalogMapper.upsertCatalogChannel(channel);
             result.incrementSynchronizedChannels();
+        }
+        return result;
+    }
+
+    @Override
+    public DeviceSyncResult syncDevices(Long zlmServerId, List<Gb28181Channel> channels) {
+        if (zlmServerId == null) {
+            throw new ServiceException("zlmServerId 不能为空");
+        }
+        if (zlmServerMapper == null || hDeviceMapper == null) {
+            throw new ServiceException("国标设备同步缺少持久化依赖");
+        }
+        ZlmServer server = zlmServerMapper.selectEnabledById(zlmServerId);
+        if (server == null) {
+            throw new ServiceException("ZLM 节点不存在或未启用: " + zlmServerId);
+        }
+
+        List<Gb28181Channel> incoming = channels == null ? Collections.<Gb28181Channel>emptyList() : channels;
+        for (Gb28181Channel channel : incoming) {
+            validateCatalogChannel(channel);
+            if (!zlmServerId.equals(channel.getZlmServerId())) {
+                throw new ServiceException("目录通道 zlmServerId 与请求不一致: " + channel.getChannelId());
+            }
+        }
+
+        List<Gb28181Channel> cataloged = catalogMapper.selectChannelsByZlmServerId(zlmServerId);
+        Set<String> incomingKeys = incoming.stream().map(this::identityKey).collect(Collectors.toSet());
+        Set<String> existingKeys = cataloged.stream()
+            .map(this::identityKey)
+            .collect(Collectors.toCollection(HashSet::new));
+
+        DeviceSyncResult result = new DeviceSyncResult();
+        for (Gb28181Channel existing : cataloged) {
+            if (!incomingKeys.contains(identityKey(existing))) {
+                int rows = hDeviceMapper.updateGbDeviceOnlineByChannel(
+                    zlmServerId, existing.getDeviceId(), existing.getChannelId(), OFFLINE);
+                result.addOfflineMarked(rows);
+            }
+        }
+
+        for (Gb28181Channel channel : incoming) {
+            catalogMapper.upsertCatalogChannel(channel);
+            HDevice existed = hDeviceMapper.selectGbDevice(
+                zlmServerId, channel.getDeviceId(), channel.getChannelId());
+            HDevice mirror = new HDevice();
+            mirror.setApe_id(existed == null
+                ? buildApeId(channel.getDeviceId(), channel.getChannelId())
+                : existed.getApe_id());
+            mirror.setName(channel.getName());
+            mirror.setDevice_type(GB_DEVICE_TYPE);
+            mirror.setStream_source_type("PLATFORM");
+            mirror.setGb_platform_id(channel.getPlatformId());
+            mirror.setGb_device_id(channel.getDeviceId());
+            mirror.setGb_channel_id(channel.getChannelId());
+            mirror.setPlay_url(channel.getPlayUrl());
+            mirror.setZlm_server_id(zlmServerId);
+            mirror.setIs_online(ONLINE);
+            mirror.setMonitor_status(existed == null ? "STOPPED" : existed.getMonitor_status());
+            mirror.setSync_source("GB28181目录");
+            hDeviceMapper.upsertGbDevice(mirror);
+            if (existed == null) {
+                result.incrementCreated();
+            } else {
+                result.incrementUpdated();
+            }
         }
         return result;
     }
@@ -70,6 +142,11 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
                 result.incrementAvailable();
             } else {
                 result.incrementUnavailable();
+            }
+            if (hDeviceMapper != null) {
+                hDeviceMapper.updateGbDeviceOnlineByChannel(
+                    zlmServerId, channel.getDeviceId(), channel.getChannelId(),
+                    available ? ONLINE : OFFLINE);
             }
         }
         return result;
@@ -138,6 +215,15 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
 
     private String bindingKey(Gb28181Channel channel) {
         return channel.getVhost() + "\u0000" + channel.getApp() + "\u0000" + channel.getStream();
+    }
+
+    private String identityKey(Gb28181Channel channel) {
+        return channel.getDeviceId() + "\u0000" + channel.getChannelId();
+    }
+
+    private String buildApeId(String deviceId, String channelId) {
+        String stream = "gb-" + String.valueOf(deviceId) + "-" + String.valueOf(channelId);
+        return stream.replaceAll("[^A-Za-z0-9_-]", "");
     }
 
     private String text(JsonNode item, String field) {

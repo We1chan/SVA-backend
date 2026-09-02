@@ -1,5 +1,6 @@
 package com.ruoyi.waring.service;
 
+import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.domain.HDevice;
 
 import java.util.List;
@@ -31,4 +32,8 @@ public interface HDeviceService {
     int stopMonitor(String apeId);
 
     Map<String, Object> previewMonitor(String apeId);
+
+    Map<String, Object> syncGb28181Catalog(Long zlmServerId, List<Gb28181Channel> channels);
+
+    Map<String, Object> refreshGb28181Status(Long zlmServerId);
 }

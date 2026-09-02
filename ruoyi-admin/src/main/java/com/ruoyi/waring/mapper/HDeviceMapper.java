@@ -26,6 +26,11 @@ public interface HDeviceMapper {
 
     int markGbDevicesOffline(@Param("zlmServerId") Long zlmServerId);
 
+    int updateGbDeviceOnlineByChannel(@Param("zlmServerId") Long zlmServerId,
+                                      @Param("gbDeviceId") String gbDeviceId,
+                                      @Param("gbChannelId") String gbChannelId,
+                                      @Param("isOnline") String isOnline);
+
     int insertDeviceCrud(HDevice device);
 
     int updateDevice(HDevice device);
