@@ -91,6 +91,9 @@ public class HWaringController extends BaseController implements SvaDetectEventC
     private static final String SVA_RELATION_APART_ALARM_TYPE_NAME = "目标远离告警";
     private static final String SVA_RELATION_NOT_CONTAINS_ALARM_TYPE = "SVA_RELATION_NOT_CONTAINS";
     private static final String SVA_RELATION_NOT_CONTAINS_ALARM_TYPE_NAME = "目标未包含告警";
+    private static final String SLEEP_DUTY_ALARM_TYPE = "SLEEP_DUTY";
+    private static final String SLEEP_DUTY_ALARM_TYPE_NAME = "睡岗告警";
+    private static final String SLEEP_DUTY_BEHAVIOR_TYPE = "sleep_duty";
 
     @Autowired
     private RestTemplate restTemplate;
@@ -1243,7 +1246,7 @@ public class HWaringController extends BaseController implements SvaDetectEventC
             || "count_threshold".equals(normalized) || "occupancy".equals(normalized)
             || "direction_move".equals(normalized) || "direction_reverse".equals(normalized)
             || "relation_near".equals(normalized) || "relation_apart".equals(normalized)
-            || "relation_not_contains".equals(normalized)) {
+            || "relation_not_contains".equals(normalized) || "sleep_duty".equals(normalized)) {
             return normalized;
         }
         return "";
@@ -1291,6 +1294,9 @@ public class HWaringController extends BaseController implements SvaDetectEventC
         }
         if ("relation_not_contains".equals(behaviorType)) {
             return new AlarmTypeMeta(SVA_RELATION_NOT_CONTAINS_ALARM_TYPE, SVA_RELATION_NOT_CONTAINS_ALARM_TYPE_NAME);
+        }
+        if (SLEEP_DUTY_BEHAVIOR_TYPE.equals(behaviorType)) {
+            return new AlarmTypeMeta(SLEEP_DUTY_ALARM_TYPE, SLEEP_DUTY_ALARM_TYPE_NAME);
         }
         return null;
     }

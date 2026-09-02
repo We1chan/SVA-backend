@@ -48,6 +48,7 @@
         <result property="ai_review_summary" column="ai_review_summary"/>
         <result property="ai_false_positive_score" column="ai_false_positive_score"/>
         <result property="ai_review_time" column="ai_review_time"/>
+        <result property="device_type" column="device_type"/>
     </resultMap>
 
     <sql id="selectWaringVo">
@@ -135,8 +136,10 @@
                                                     ORDER BY t.id DESC
                                                     LIMIT 1
                                  )
-                                 LIMIT 1) AS ai_review_time
+                                 LIMIT 1) AS ai_review_time,
+                             hd.device_type AS device_type
         FROM h_waring hw
+        LEFT JOIN h_device hd ON hd.ape_id = hw.device_id
     </sql>
 
     <select id="selectWaringById" parameterType="java.lang.String" resultType="HWaring">
