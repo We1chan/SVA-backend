@@ -25,6 +25,8 @@ public class ZlmServer {
 
     private Integer media_http_port;
 
+    private Integer media_rtmp_port;
+
     private Integer media_rtsp_port;
 
     private String secret;

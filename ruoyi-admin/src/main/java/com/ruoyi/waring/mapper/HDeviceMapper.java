@@ -33,6 +33,20 @@ public interface HDeviceMapper {
     int updateZlmProxyKeyByApeId(@Param("apeId") String apeId,
                                  @Param("zlmProxyKey") String zlmProxyKey);
 
+    int markAllGb28181DevicesOffline();
+
+    int clearOfflineGb28181Playback();
+
+    int upsertGb28181Device(HDevice device);
+
+    int updateGb28181Playback(@Param("apeId") String apeId,
+                              @Param("playUrl") String playUrl,
+                              @Param("streamId") String streamId,
+                              @Param("streamUrl") String streamUrl,
+                              @Param("mediaServerId") String mediaServerId);
+
+    int clearGb28181Playback(@Param("apeId") String apeId);
+
     List<HDevice> selectDeviceList(HDevice device);
 
     List<HDevice> selectLDeviceList(HDevice device);

@@ -72,6 +72,10 @@ public class DeploymentAnalyzerClient
 
         String apeId = task.getDeviceId();
         String streamUrl = buildStreamUrl(bindingConfig, apeId);
+        if (StringUtils.isEmpty(streamUrl))
+        {
+            return AnalyzerResult.fail("streamUrl不能为空，请先启动设备监控");
+        }
 
         boolean pushStream = Boolean.TRUE.equals(task.getPushEnabled());
         boolean frontendOverlayEnabled = Boolean.TRUE.equals(task.getFrontendOverlayEnabled());
@@ -253,6 +257,37 @@ public class DeploymentAnalyzerClient
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("code", task.getDeploymentId());
         return postJson(bindingConfig.getAnalyzerBaseUrl() + "/api/control/cancel", payload, "cancel");
+    }
+
+    public AnalyzerResult updateLiveOutput(DeploymentTask task, boolean videoEnabled,
+                                           boolean liveEventEnabled, float wsEventFps)
+    {
+        if (task == null || StringUtils.isEmpty(task.getDeploymentId()))
+        {
+            return AnalyzerResult.fail("布控任务不存在");
+        }
+        BindingConfig bindingConfig = resolveBinding(task.getDeviceId());
+        if (bindingConfig == null)
+        {
+            return AnalyzerResult.fail("未绑定可用服务器或配置缺失");
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("controlCode", task.getDeploymentId());
+        payload.put("videoEnabled", videoEnabled);
+        payload.put("liveEventEnabled", liveEventEnabled);
+        payload.put("wsEventFps", wsEventFps);
+        if (videoEnabled)
+        {
+            String pushStreamUrl = buildPushStreamUrl(bindingConfig, task.getDeploymentId());
+            if (StringUtils.isEmpty(pushStreamUrl))
+            {
+                return AnalyzerResult.fail("无法生成算法流推送地址");
+            }
+            payload.put("pushStreamUrl", pushStreamUrl);
+        }
+        return postJson(bindingConfig.getAnalyzerBaseUrl() + "/api/control/live-output",
+            payload, "live-output");
     }
 
     public AnalyzerResult cancelControl(String deploymentId)
@@ -478,8 +513,14 @@ public class DeploymentAnalyzerClient
 
         String zlmApp = StringUtils.isBlank(zlmServer.getApp()) ? DEFAULT_ZLM_APP : zlmServer.getApp().trim();
         String svaApp = StringUtils.isBlank(svaServer.getApp()) ? DEFAULT_SVA_APP : svaServer.getApp().trim();
+        boolean gb28181 = "GB28181".equalsIgnoreCase(device.getStream_source_type());
+        String sourceStreamUrl = gb28181 && "1".equals(device.getIs_online())
+            ? device.getGb_stream_url() : null;
+        Integer rtmpPort = zlmServer.getMedia_rtmp_port();
+        int effectiveRtmpPort = (rtmpPort != null && rtmpPort > 0) ? rtmpPort : 9995;
         return new BindingConfig(zlmServer.getHost().trim(), zlmApp, zlmServer.getMedia_rtsp_port(),
-            zlmServer.getMedia_http_port(), svaServer.getHost().trim(), svaApp, svaServer.getAnalyzer_port());
+            effectiveRtmpPort, zlmServer.getMedia_http_port(), svaServer.getHost().trim(), svaApp,
+            svaServer.getAnalyzer_port(), gb28181, sourceStreamUrl);
     }
 
     private String buildStreamUrl(BindingConfig config, String apeId)
@@ -487,6 +528,10 @@ public class DeploymentAnalyzerClient
         if (StringUtils.isBlank(apeId))
         {
             return null;
+        }
+        if (config.gb28181)
+        {
+            return StringUtils.isBlank(config.sourceStreamUrl) ? null : config.sourceStreamUrl;
         }
         return "rtsp://" + config.zlmHost + ":" + config.zlmMediaRtspPort + "/" + config.zlmApp + "/" + apeId;
     }
@@ -497,7 +542,7 @@ public class DeploymentAnalyzerClient
         {
             return null;
         }
-        return "rtsp://" + config.zlmHost + ":" + config.zlmMediaRtspPort + "/" + config.svaApp + "/" + deploymentId;
+        return "rtmp://" + config.zlmHost + ":" + config.zlmMediaRtmpPort + "/" + config.svaApp + "/" + deploymentId;
     }
 
     private String buildAlgorithmStreamUrl(BindingConfig config, String deploymentId)
@@ -524,21 +569,28 @@ public class DeploymentAnalyzerClient
         private final String zlmHost;
         private final String zlmApp;
         private final int zlmMediaRtspPort;
+        private final int zlmMediaRtmpPort;
         private final int zlmMediaHttpPort;
         private final String svaHost;
         private final String svaApp;
         private final int svaAnalyzerPort;
+        private final boolean gb28181;
+        private final String sourceStreamUrl;
 
-        private BindingConfig(String zlmHost, String zlmApp, int zlmMediaRtspPort, int zlmMediaHttpPort,
-            String svaHost, String svaApp, int svaAnalyzerPort)
+        private BindingConfig(String zlmHost, String zlmApp, int zlmMediaRtspPort, int zlmMediaRtmpPort,
+            int zlmMediaHttpPort, String svaHost, String svaApp, int svaAnalyzerPort,
+            boolean gb28181, String sourceStreamUrl)
         {
             this.zlmHost = zlmHost;
             this.zlmApp = zlmApp;
             this.zlmMediaRtspPort = zlmMediaRtspPort;
+            this.zlmMediaRtmpPort = zlmMediaRtmpPort;
             this.zlmMediaHttpPort = zlmMediaHttpPort;
             this.svaHost = svaHost;
             this.svaApp = svaApp;
             this.svaAnalyzerPort = svaAnalyzerPort;
+            this.gb28181 = gb28181;
+            this.sourceStreamUrl = sourceStreamUrl;
         }
 
         private String getAnalyzerBaseUrl()
