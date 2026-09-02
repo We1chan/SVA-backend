@@ -3,7 +3,9 @@ package com.ruoyi.waring.service.impl;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.waring.domain.Gb28181PlaybackInfo;
 import com.ruoyi.waring.domain.HDevice;
+import com.ruoyi.waring.domain.ZlmServer;
 import com.ruoyi.waring.mapper.HDeviceMapper;
+import com.ruoyi.waring.mapper.ZlmServerMapper;
 import com.ruoyi.waring.service.Gb28181PlaybackService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,19 +21,28 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** 验证 GB28181 点播生命周期与原 DIRECT 设备流程之间的隔离。 */
+/**
+ * 验证两条监控路线的生命周期隔离：
+ * <ul>
+ *   <li>WVP 点播路线（stream_source_type='GB28181'）：INVITE 点播启动/停止/预览；</li>
+ *   <li>目录同步路线与 DIRECT：预览统一转换为 ZLM ws/flv 拉流地址。</li>
+ * </ul>
+ */
 class HDeviceServiceImplTest {
 
     private HDeviceServiceImpl service;
     private HDeviceMapper mapper;
+    private ZlmServerMapper zlmServerMapper;
     private Gb28181PlaybackService playbackService;
 
     @BeforeEach
     void setUp() {
         service = new HDeviceServiceImpl();
         mapper = mock(HDeviceMapper.class);
+        zlmServerMapper = mock(ZlmServerMapper.class);
         playbackService = mock(Gb28181PlaybackService.class);
         ReflectionTestUtils.setField(service, "hDeviceMapper", mapper);
+        ReflectionTestUtils.setField(service, "zlmServerMapper", zlmServerMapper);
         ReflectionTestUtils.setField(service, "gb28181PlaybackService", playbackService);
     }
 
@@ -97,6 +108,27 @@ class HDeviceServiceImplTest {
 
         verify(playbackService).stop(device.getGb_device_id(), device.getGb_channel_id());
         verify(mapper).clearGb28181Playback("GB_TEST");
+    }
+
+    @Test
+    void directDevicePreviewConvertsSourceRtspToZlmWsFlv() {
+        HDevice device = new HDevice();
+        device.setApe_id("camera-01");
+        device.setName("Camera 01");
+        device.setStream_source_type("DIRECT");
+        device.setPlay_url("rtsp://camera.example/live");
+        device.setZlm_server_id(1L);
+        when(mapper.selectDeviceByApeId("camera-01")).thenReturn(device);
+
+        ZlmServer zlmServer = new ZlmServer();
+        zlmServer.setHost("zlm.example");
+        zlmServer.setMedia_http_port(8080);
+        zlmServer.setApp("live");
+        when(zlmServerMapper.selectEnabledById(1L)).thenReturn(zlmServer);
+
+        Map<String, Object> preview = service.previewMonitor("camera-01");
+
+        assertEquals("ws://zlm.example:8080/live/camera-01.live.flv", preview.get("playUrl"));
     }
 
     private HDevice gbDevice(String online) {

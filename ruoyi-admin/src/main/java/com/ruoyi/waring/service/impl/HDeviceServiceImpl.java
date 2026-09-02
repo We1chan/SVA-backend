@@ -12,11 +12,13 @@ import com.ruoyi.common.core.page.TableSupport;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.mapper.SysDeptMapper;
 import com.ruoyi.system.mapper.SysUserMapper;
+import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.domain.Gb28181PlaybackInfo;
 import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.domain.ZlmServer;
 import com.ruoyi.waring.mapper.HDeviceMapper;
 import com.ruoyi.waring.mapper.ZlmServerMapper;
+import com.ruoyi.waring.service.Gb28181DeviceSyncService;
 import com.ruoyi.waring.service.Gb28181PlaybackService;
 import com.ruoyi.waring.service.HDeviceService;
 import org.slf4j.Logger;
@@ -27,6 +29,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
@@ -39,8 +42,14 @@ import java.util.regex.Pattern;
 /**
  * 统一设备业务服务。
  *
- * <p>共享模块：保留 DIRECT/PLATFORM 原有行为，并在监控启停与预览入口中按
- * stream_source_type 分派 GB28181 点播流程。</p>
+ * <p>共享模块：保留 DIRECT/PLATFORM 原有行为，并在监控启停与预览入口中按设备行类型分派：
+ * <ul>
+ *   <li>目录同步路线（device_type='GB28181'，stream_source_type='PLATFORM'）：媒体由 GB28181
+ *       目录同步写入 ZLM，监控启停仅做在线/播放地址校验与状态翻转。</li>
+ *   <li>WVP 点播路线（stream_source_type='GB28181'）：按 gb_device_id/gb_channel_id 发起
+ *       WVP INVITE 点播。</li>
+ * </ul>
+ * DIRECT 流仍走原代理逻辑。</p>
  */
 @Service
 @Component
@@ -51,6 +60,8 @@ public class HDeviceServiceImpl implements HDeviceService {
     private static final String STREAM_SOURCE_TYPE_DIRECT = "DIRECT";
     private static final String STREAM_SOURCE_TYPE_PLATFORM = "PLATFORM";
     private static final String STREAM_SOURCE_TYPE_GB28181 = "GB28181";
+    private static final String DEVICE_TYPE_GB28181 = "GB28181";
+    private static final String DEVICE_STATE_ONLINE = "1";
     private static final int MAX_APE_ID_GENERATE_RETRY = 20;
     private static final Pattern STREAM_NAME_PATTERN = Pattern.compile("[^A-Za-z0-9_-]");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -76,6 +87,9 @@ public class HDeviceServiceImpl implements HDeviceService {
 
     @Autowired
     private Gb28181PlaybackService gb28181PlaybackService;
+
+    @Autowired(required = false)
+    private Gb28181DeviceSyncService gb28181DeviceSyncService;
 
     @Autowired(required = false)
     private RestTemplate restTemplate;
@@ -471,9 +485,26 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("设备不存在: " + apeId);
         }
 
+        if (isCatalogGb28181Device(existedDevice)) {
+            // 目录同步路线（device_type='GB28181'，stream_source_type='PLATFORM'）：
+            // 媒体已由 GB28181 目录同步在 ZLM 中就绪，仅做在线/播放地址校验并翻转监控状态，
+            // 不发起 WVP INVITE 点播。
+            if (!DEVICE_STATE_ONLINE.equals(existedDevice.getIs_online())) {
+                throw new ServiceException("国标设备当前离线，无法启动监控");
+            }
+            if (StringUtils.isBlank(existedDevice.getPlay_url())) {
+                throw new ServiceException("国标设备暂无可用播放地址，请先执行目录同步");
+            }
+            int gbUpdated = hDeviceMapper.updateMonitorStateByApeId(apeId, MONITOR_STATUS_RUNNING);
+            if (gbUpdated <= 0) {
+                throw new ServiceException("启动监控失败: " + apeId);
+            }
+            return gbUpdated;
+        }
+
         String startPlayUrl = buildDirectPlayUrl(existedDevice);
         boolean gbPlaybackStarted = false;
-        if (isGb28181Device(existedDevice)) {
+        if (isWvpGb28181Device(existedDevice)) {
             // GB28181 必须先由 WVP 确认在线，再发起 INVITE；DIRECT 流仍走原代理逻辑。
             if (!"1".equals(existedDevice.getIs_online())) {
                 throw new ServiceException("GB28181 设备当前离线，无法点播");
@@ -545,8 +576,17 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("设备不存在: " + apeId);
         }
 
+        if (isCatalogGb28181Device(existedDevice)) {
+            // 目录同步路线：停止监控仅翻转状态；play_url 由目录同步按周期重写，不在此清空。
+            int gbUpdated = hDeviceMapper.updateMonitorStateByApeId(apeId, MONITOR_STATUS_STOPPED);
+            if (gbUpdated <= 0) {
+                throw new ServiceException("停止监控失败: " + apeId);
+            }
+            return gbUpdated;
+        }
+
         boolean directProxyDeleted = false;
-        if (isGb28181Device(existedDevice)) {
+        if (isWvpGb28181Device(existedDevice)) {
             try {
                 gb28181PlaybackService.stop(existedDevice.getGb_device_id(), existedDevice.getGb_channel_id());
             } catch (Exception e) {
@@ -566,7 +606,7 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("停止监控失败: " + apeId);
         }
 
-        if (isGb28181Device(existedDevice)) {
+        if (isWvpGb28181Device(existedDevice)) {
             hDeviceMapper.clearGb28181Playback(apeId);
         } else {
             hDeviceMapper.updatePlayUrlByApeId(apeId, null);
@@ -589,7 +629,16 @@ public class HDeviceServiceImpl implements HDeviceService {
         }
 
         String previewPlayUrl;
-        if (isGb28181Device(device)) {
+        if (isCatalogGb28181Device(device)) {
+            // 目录同步路线：直接用目录同步写入的 play_url 预览。
+            if (!DEVICE_STATE_ONLINE.equals(device.getIs_online())) {
+                throw new ServiceException("国标设备当前离线，无法预览");
+            }
+            if (StringUtils.isBlank(device.getPlay_url())) {
+                throw new ServiceException("国标设备暂无可用播放地址，请先执行目录同步");
+            }
+            previewPlayUrl = device.getPlay_url();
+        } else if (isWvpGb28181Device(device)) {
             // 国标预览只能使用本次 INVITE 生成的地址，不回退到 DIRECT 源地址。
             if (!"1".equals(device.getIs_online())) {
                 throw new ServiceException("GB28181 设备当前离线，无法预览");
@@ -600,6 +649,14 @@ public class HDeviceServiceImpl implements HDeviceService {
             }
         } else {
             previewPlayUrl = device.getPlay_url();
+            // DIRECT 设备若 play_url 仍为源站 RTSP（监控未启动/直连源），
+            // 预览统一转换为 ZLM ws/flv 拉流地址，保证浏览器可播。
+            if (isDirectDevice(device) && StringUtils.startsWithIgnoreCase(previewPlayUrl, "rtsp://")) {
+                String directPlayUrl = buildDirectPlayUrl(device);
+                if (StringUtils.isNotBlank(directPlayUrl)) {
+                    previewPlayUrl = directPlayUrl;
+                }
+            }
             if (StringUtils.isBlank(previewPlayUrl)) {
                 previewPlayUrl = buildDirectPlayUrl(device);
             }
@@ -637,8 +694,68 @@ public class HDeviceServiceImpl implements HDeviceService {
         return device != null && STREAM_SOURCE_TYPE_DIRECT.equalsIgnoreCase(device.getStream_source_type());
     }
 
-    private boolean isGb28181Device(HDevice device) {
+    /** WVP 点播路线：stream_source_type='GB28181'，通过 WVP INVITE 产生点播流。 */
+    private boolean isWvpGb28181Device(HDevice device) {
         return device != null && STREAM_SOURCE_TYPE_GB28181.equalsIgnoreCase(device.getStream_source_type());
+    }
+
+    /** 目录同步路线：device_type='GB28181'（stream_source_type 为 PLATFORM），媒体由 GB28181 目录同步写入 ZLM。 */
+    private boolean isCatalogGb28181Device(HDevice device) {
+        return device != null
+            && DEVICE_TYPE_GB28181.equalsIgnoreCase(device.getDevice_type())
+            && !STREAM_SOURCE_TYPE_GB28181.equalsIgnoreCase(device.getStream_source_type());
+    }
+
+    @Override
+    public Map<String, Object> syncGb28181Catalog(Long zlmServerId, List<Gb28181Channel> channels) {
+        if (gb28181DeviceSyncService == null) {
+            throw new ServiceException("国标设备同步服务不可用");
+        }
+        Gb28181DeviceSyncService.DeviceSyncResult result =
+            gb28181DeviceSyncService.syncDevices(zlmServerId, channels);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("created", result.getCreated());
+        payload.put("updated", result.getUpdated());
+        payload.put("offlineMarked", result.getOfflineMarked());
+        return payload;
+    }
+
+    @Override
+    public Map<String, Object> refreshGb28181Status(Long zlmServerId) {
+        if (gb28181DeviceSyncService == null) {
+            throw new ServiceException("国标设备刷新服务不可用");
+        }
+        Gb28181DeviceSyncService.MediaRefreshResult result =
+            gb28181DeviceSyncService.refreshMediaFromZlm(zlmServerId);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("available", result.getAvailable());
+        payload.put("unavailable", result.getUnavailable());
+        return payload;
+    }
+
+    /**
+     * Periodically refresh GB28181 media availability from every enabled ZLM node.
+     * Failures are logged only and never flip RTSP devices offline.
+     */
+    @Scheduled(fixedDelayString = "${easysva.gb28181.status-refresh-ms:60000}")
+    public void scheduledGb28181StatusRefresh() {
+        if (gb28181DeviceSyncService == null || zlmServerMapper == null) {
+            return;
+        }
+        List<ZlmServer> servers = zlmServerMapper.selectEnabledList();
+        if (servers == null) {
+            return;
+        }
+        for (ZlmServer server : servers) {
+            if (server == null || server.getId() == null) {
+                continue;
+            }
+            try {
+                gb28181DeviceSyncService.refreshMediaFromZlm(server.getId());
+            } catch (Exception ex) {
+                log.error("GB28181 状态定时刷新失败, zlmServerId={}", server.getId(), ex);
+            }
+        }
     }
 
     private void stopGb28181PlaybackQuietly(HDevice device, String reason) {

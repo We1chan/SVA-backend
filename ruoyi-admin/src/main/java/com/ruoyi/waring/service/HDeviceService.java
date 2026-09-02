@@ -1,5 +1,6 @@
 package com.ruoyi.waring.service;
 
+import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.domain.HDevice;
 
 import java.util.List;
@@ -40,4 +41,14 @@ public interface HDeviceService {
 
     /** 返回浏览器当前可用的预览地址；该方法本身不隐式启动点播。 */
     Map<String, Object> previewMonitor(String apeId);
+
+    /**
+     * Reconcile the authoritative SIP/GB catalog snapshot for a ZLM node.
+     * A {@code null} list means no snapshot and performs no reconciliation;
+     * an explicit empty list is authoritative and reconciles existing GB
+     * channels offline.
+     */
+    Map<String, Object> syncGb28181Catalog(Long zlmServerId, List<Gb28181Channel> channels);
+
+    Map<String, Object> refreshGb28181Status(Long zlmServerId);
 }

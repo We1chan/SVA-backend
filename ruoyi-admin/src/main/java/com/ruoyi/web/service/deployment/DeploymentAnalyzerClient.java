@@ -80,7 +80,8 @@ public class DeploymentAnalyzerClient
         String streamUrl = buildStreamUrl(bindingConfig, apeId);
         if (StringUtils.isEmpty(streamUrl))
         {
-            return AnalyzerResult.fail("streamUrl不能为空，请先启动设备监控");
+            return AnalyzerResult.fail("设备无可播放媒体流（GB28181设备离线或媒体未同步）",
+                "buildStreamUrl返回空: deviceId=" + apeId);
         }
 
         boolean pushStream = Boolean.TRUE.equals(task.getPushEnabled());
@@ -523,11 +524,29 @@ public class DeploymentAnalyzerClient
         // 国标分析只能消费当前在线点播产生的 RTSP 地址；DIRECT 设备仍按原 ZLM 路径拼接。
         String sourceStreamUrl = gb28181 && "1".equals(device.getIs_online())
             ? device.getGb_stream_url() : null;
+        // 目录同步路线（device_type='GB28181'）：play_url 由 GB28181 目录同步写入 ZLM 媒体引用，
+        // 需显式解析 app/stream 拼接 analyzer 拉流地址，不能按 RTSP 惯例用 ape_id 作为流名
+        // （ZLM 中不存在该流名，拉流必失败）。
+        String catalogPlayUrl = null;
+        String catalogPlay = device.getPlay_url();
+        if (StringUtils.isNotBlank(catalogPlay) && "GB28181".equalsIgnoreCase(device.getDevice_type()))
+        {
+            String mediaRef = extractZlmMediaRef(catalogPlay);
+            if (mediaRef == null)
+            {
+                log.warn("GB28181设备缺少可解析的play_url, 无法构建analyzer拉流地址, deviceId={}", apeId);
+            }
+            else
+            {
+                catalogPlayUrl = "rtsp://" + zlmServer.getHost().trim() + ":" + zlmServer.getMedia_rtsp_port()
+                    + "/" + mediaRef;
+            }
+        }
         Integer rtmpPort = zlmServer.getMedia_rtmp_port();
         int effectiveRtmpPort = (rtmpPort != null && rtmpPort > 0) ? rtmpPort : 9995;
         return new BindingConfig(zlmServer.getHost().trim(), zlmApp, zlmServer.getMedia_rtsp_port(),
             effectiveRtmpPort, zlmServer.getMedia_http_port(), svaServer.getHost().trim(), svaApp,
-            svaServer.getAnalyzer_port(), gb28181, sourceStreamUrl);
+            svaServer.getAnalyzer_port(), gb28181, sourceStreamUrl, catalogPlayUrl);
     }
 
     private String buildStreamUrl(BindingConfig config, String apeId)
@@ -536,11 +555,56 @@ public class DeploymentAnalyzerClient
         {
             return null;
         }
+        // 目录同步路线：显式绑定媒体引用优先（已解析为 rtsp://host:rtspPort/app/stream）
+        if (!StringUtils.isBlank(config.catalogPlayUrl))
+        {
+            return config.catalogPlayUrl;
+        }
         if (config.gb28181)
         {
             return StringUtils.isBlank(config.sourceStreamUrl) ? null : config.sourceStreamUrl;
         }
         return "rtsp://" + config.zlmHost + ":" + config.zlmMediaRtspPort + "/" + config.zlmApp + "/" + apeId;
+    }
+
+    /**
+     * 从 ZLM play_url（如 ws://host:port/live/stream.live.flv）解析出 "app/stream" 媒体引用。
+     */
+    private String extractZlmMediaRef(String playUrl)
+    {
+        if (StringUtils.isBlank(playUrl))
+        {
+            return null;
+        }
+        String rest = playUrl.trim();
+        int scheme = rest.indexOf("://");
+        if (scheme >= 0)
+        {
+            rest = rest.substring(scheme + 3);
+        }
+        int slash = rest.indexOf('/');
+        if (slash < 0)
+        {
+            return null;
+        }
+        String path = rest.substring(slash + 1);
+        while (path.endsWith("/"))
+        {
+            path = path.substring(0, path.length() - 1);
+        }
+        if (path.endsWith(".live.flv"))
+        {
+            path = path.substring(0, path.length() - ".live.flv".length());
+        }
+        else if (path.endsWith(".flv"))
+        {
+            path = path.substring(0, path.length() - ".flv".length());
+        }
+        if (path.isEmpty())
+        {
+            return null;
+        }
+        return path;
     }
 
     private String buildPushStreamUrl(BindingConfig config, String deploymentId)
@@ -583,10 +647,11 @@ public class DeploymentAnalyzerClient
         private final int svaAnalyzerPort;
         private final boolean gb28181;
         private final String sourceStreamUrl;
+        private final String catalogPlayUrl;
 
         private BindingConfig(String zlmHost, String zlmApp, int zlmMediaRtspPort, int zlmMediaRtmpPort,
             int zlmMediaHttpPort, String svaHost, String svaApp, int svaAnalyzerPort,
-            boolean gb28181, String sourceStreamUrl)
+            boolean gb28181, String sourceStreamUrl, String catalogPlayUrl)
         {
             this.zlmHost = zlmHost;
             this.zlmApp = zlmApp;
@@ -598,6 +663,7 @@ public class DeploymentAnalyzerClient
             this.svaAnalyzerPort = svaAnalyzerPort;
             this.gb28181 = gb28181;
             this.sourceStreamUrl = sourceStreamUrl;
+            this.catalogPlayUrl = catalogPlayUrl;
         }
 
         private String getAnalyzerBaseUrl()

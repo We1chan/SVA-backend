@@ -4,7 +4,15 @@
 
     <!--
       共享设备映射：DIRECT、PLATFORM 与 GB28181 共用 h_device。
-      国标字段保持可空，协议专用写操作均限制 stream_source_type='GB28181'。
+
+      两条 GB28181 集成路线共存：
+      - 目录同步路线（device_type='GB28181'，stream_source_type='PLATFORM'）：
+        以 gb28181_channel 为权威目录，镜像列含 device_type / gb_platform_id /
+        sync_source / play_url / is_online（1 在线、2 离线）。
+      - WVP 点播路线（stream_source_type='GB28181'）：以 h_device 上的 gb_* 列为准，
+        is_online 用 0/1 语义；写操作均限定 stream_source_type='GB28181' 防止越界。
+
+      两条路线的离线标记与更新语句按各自类型过滤，互不覆盖对方的行。
     -->
 
     <resultMap type="com.ruoyi.waring.domain.HDevice" id="HDeviceResult">
@@ -14,12 +22,15 @@
         <result property="direct_source_url" column="direct_source_url"/>
         <result property="play_url" column="play_url"/>
         <result property="zlm_proxy_key" column="zlm_proxy_key"/>
+        <result property="device_type" column="device_type"/>
         <result property="gb_device_id" column="gb_device_id"/>
+        <result property="gb_platform_id" column="gb_platform_id"/>
         <result property="gb_channel_id" column="gb_channel_id"/>
         <result property="gb_media_server_id" column="gb_media_server_id"/>
         <result property="gb_stream_id" column="gb_stream_id"/>
         <result property="gb_stream_url" column="gb_stream_url"/>
         <result property="gb_last_sync_time" column="gb_last_sync_time"/>
+        <result property="sync_source" column="sync_source"/>
         <result property="resource_type" column="resource_type"/>
         <result property="sub_type" column="sub_type"/>
         <result property="ip_addr" column="ip_addr"/>
@@ -47,12 +58,15 @@
             direct_source_url,
             play_url,
             zlm_proxy_key,
+            device_type,
             gb_device_id,
+            gb_platform_id,
             gb_channel_id,
             gb_media_server_id,
             gb_stream_id,
             gb_stream_url,
             gb_last_sync_time,
+            sync_source,
             resource_type,
             sub_type,
             ip_addr,
@@ -76,9 +90,9 @@
 
     <insert id="insertDevice">
         INSERT INTO h_device
-        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, gb_device_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_stream_url, gb_last_sync_time, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
+        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, device_type, gb_device_id, gb_platform_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_stream_url, gb_last_sync_time, sync_source, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
         VALUES
-            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_stream_url}, #{gb_last_sync_time}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
+            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, IFNULL(UPPER(#{device_type}), 'RTSP'), #{gb_device_id}, #{gb_platform_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_stream_url}, #{gb_last_sync_time}, #{sync_source}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
     </insert>
 
     <delete id="deleteDevice">
@@ -92,9 +106,9 @@
 
     <insert id="insertDeviceCrud" parameterType="HDevice">
         INSERT INTO h_device
-        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, gb_device_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_stream_url, gb_last_sync_time, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
+        (ape_id, name, stream_source_type, direct_source_url, play_url, zlm_proxy_key, device_type, gb_device_id, gb_platform_id, gb_channel_id, gb_media_server_id, gb_stream_id, gb_stream_url, gb_last_sync_time, sync_source, resource_type, sub_type, ip_addr, port, org_index, org_name, place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id, sva_server_id, monitor_status, create_time, update_time)
         VALUES
-            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_stream_url}, #{gb_last_sync_time}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
+            (#{ape_id}, #{name}, IFNULL(UPPER(#{stream_source_type}), 'DIRECT'), #{direct_source_url}, #{play_url}, #{zlm_proxy_key}, IFNULL(UPPER(#{device_type}), 'RTSP'), #{gb_device_id}, #{gb_platform_id}, #{gb_channel_id}, #{gb_media_server_id}, #{gb_stream_id}, #{gb_stream_url}, #{gb_last_sync_time}, #{sync_source}, #{resource_type}, #{sub_type}, #{ip_addr}, #{port}, #{org_index}, #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name}, #{parent_code}, IFNULL(#{zlm_server_id}, 1), IFNULL(#{sva_server_id}, 1), IFNULL(#{monitor_status}, 'STOPPED'), #{create_time}, #{update_time})
     </insert>
 
     <update id="updateDevice" parameterType="HDevice">
@@ -105,12 +119,15 @@
             <if test="direct_source_url != null">direct_source_url = #{direct_source_url},</if>
             <if test="play_url != null">play_url = #{play_url},</if>
             <if test="zlm_proxy_key != null">zlm_proxy_key = #{zlm_proxy_key},</if>
+            <if test="device_type != null and device_type != ''">device_type = #{device_type},</if>
             <if test="gb_device_id != null">gb_device_id = #{gb_device_id},</if>
+            <if test="gb_platform_id != null">gb_platform_id = #{gb_platform_id},</if>
             <if test="gb_channel_id != null">gb_channel_id = #{gb_channel_id},</if>
             <if test="gb_media_server_id != null">gb_media_server_id = #{gb_media_server_id},</if>
             <if test="gb_stream_id != null">gb_stream_id = #{gb_stream_id},</if>
             <if test="gb_stream_url != null">gb_stream_url = #{gb_stream_url},</if>
             <if test="gb_last_sync_time != null">gb_last_sync_time = #{gb_last_sync_time},</if>
+            <if test="sync_source != null">sync_source = #{sync_source},</if>
             <if test="resource_type != null">resource_type = #{resource_type},</if>
             <if test="sub_type != null">sub_type = #{sub_type},</if>
             <if test="ip_addr != null">ip_addr = #{ip_addr},</if>
@@ -150,6 +167,51 @@
         SET zlm_proxy_key = #{zlmProxyKey}
         WHERE ape_id = #{apeId}
     </update>
+
+    <!-- ============ 目录同步路线（device_type='GB28181'，镜像列） ============ -->
+
+    <select id="selectGbDevice" resultMap="HDeviceResult">
+        <include refid="selectDeviceVo"/>
+        WHERE zlm_server_id = #{zlmServerId}
+          AND gb_device_id = #{gbDeviceId}
+          AND gb_channel_id = #{gbChannelId}
+          AND device_type = 'GB28181'
+        LIMIT 1
+    </select>
+
+    <insert id="upsertGbDevice" parameterType="HDevice">
+        INSERT INTO h_device
+        (ape_id, name, device_type, gb_device_id, gb_platform_id, gb_channel_id, sync_source,
+         play_url, is_online, zlm_server_id, monitor_status, stream_source_type, create_time, update_time)
+        VALUES
+        (#{ape_id}, #{name}, 'GB28181', #{gb_device_id}, #{gb_platform_id}, #{gb_channel_id}, #{sync_source},
+         #{play_url}, #{is_online}, #{zlm_server_id}, #{monitor_status}, 'PLATFORM', NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            gb_platform_id = VALUES(gb_platform_id),
+            sync_source = VALUES(sync_source),
+            play_url = VALUES(play_url),
+            is_online = VALUES(is_online),
+            monitor_status = VALUES(monitor_status),
+            update_time = NOW()
+    </insert>
+
+    <update id="markGbDevicesOffline">
+        UPDATE h_device
+        SET is_online = '2', monitor_status = 'STOPPED', update_time = NOW()
+        WHERE device_type = 'GB28181' AND zlm_server_id = #{zlmServerId}
+    </update>
+
+    <update id="updateGbDeviceOnlineByChannel">
+        UPDATE h_device
+        SET is_online = #{isOnline}, update_time = NOW()
+        WHERE zlm_server_id = #{zlmServerId}
+          AND gb_device_id = #{gbDeviceId}
+          AND gb_channel_id = #{gbChannelId}
+          AND device_type = 'GB28181'
+    </update>
+
+    <!-- ============ WVP 点播路线（stream_source_type='GB28181'） ============ -->
 
     <!-- GB28181 完整快照同步：预置离线 -> upsert 当前通道 -> 清理离线会话。 -->
     <update id="markAllGb28181DevicesOffline">
@@ -224,6 +286,8 @@
           AND stream_source_type = 'GB28181'
     </update>
 
+    <!-- ============ 通用查询 ============ -->
+
     <delete id="deleteDeviceByApeIds">
         DELETE FROM h_device
         WHERE ape_id IN
@@ -249,6 +313,9 @@
             </if>
             <if test="stream_source_type != null and stream_source_type != ''">
                 AND stream_source_type = UPPER(#{stream_source_type})
+            </if>
+            <if test="device_type != null and device_type != ''">
+                AND device_type = #{device_type}
             </if>
             <if test="gb_device_id != null and gb_device_id != ''">
                 AND gb_device_id = #{gb_device_id}
@@ -315,6 +382,9 @@
             </if>
             <if test="name != null and name != ''">
                 AND `name` like concat('%', #{name}, '%')
+            </if>
+            <if test="device_type != null and device_type != ''">
+                AND device_type = #{device_type}
             </if>
             <if test="ip_addr != null and ip_addr != ''">
                 AND ip_addr like concat('%', #{ip_addr}, '%')

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.waring.mapper.Gb28181CatalogMapper">
+    <resultMap id="Gb28181ChannelResult" type="com.ruoyi.waring.domain.Gb28181Channel">
+        <result property="id" column="id"/>
+        <result property="platformId" column="platform_id"/>
+        <result property="deviceId" column="device_id"/>
+        <result property="channelId" column="channel_id"/>
+        <result property="name" column="channel_name"/>
+        <result property="catalogOnline" column="catalog_online"/>
+        <result property="zlmServerId" column="zlm_server_id"/>
+        <result property="vhost" column="vhost"/>
+        <result property="app" column="app"/>
+        <result property="stream" column="stream"/>
+        <result property="playUrl" column="play_url"/>
+    </resultMap>
+
+    <insert id="upsertCatalogChannel" parameterType="com.ruoyi.waring.domain.Gb28181Channel">
+        INSERT INTO gb28181_channel
+        (platform_id, device_id, channel_id, channel_name, catalog_online, zlm_server_id, vhost, app, stream, play_url, create_time, update_time)
+        VALUES
+        (#{platformId}, #{deviceId}, #{channelId}, #{name}, #{catalogOnline}, #{zlmServerId}, #{vhost}, #{app}, #{stream}, #{playUrl}, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+            channel_name = VALUES(channel_name),
+            catalog_online = VALUES(catalog_online),
+            zlm_server_id = VALUES(zlm_server_id),
+            vhost = VALUES(vhost),
+            app = VALUES(app),
+            stream = VALUES(stream),
+            play_url = VALUES(play_url),
+            update_time = NOW()
+    </insert>
+
+    <select id="selectChannelsByZlmServerId" resultMap="Gb28181ChannelResult">
+        SELECT id, platform_id, device_id, channel_id, channel_name, catalog_online,
+               zlm_server_id, vhost, app, stream, play_url
+        FROM gb28181_channel
+        WHERE zlm_server_id = #{zlmServerId}
+          AND vhost IS NOT NULL AND app IS NOT NULL AND stream IS NOT NULL
+    </select>
+
+    <update id="updateMediaAvailability">
+        UPDATE gb28181_channel
+        SET media_online = #{available}, last_media_seen_at = CASE WHEN #{available} THEN NOW() ELSE last_media_seen_at END,
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>

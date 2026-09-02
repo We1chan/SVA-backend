@@ -32,6 +32,11 @@ public class HWaring extends BaseEntity {
     @Excel(name = "告警设备")
     private String device_name;
 
+    /**
+     * 设备类型，来源于 h_device 关联（LEFT JOIN），用于告警页设备类型列。
+     */
+    private String device_type;
+
     private String org_index;
 
     @Excel(name = "所属组织")

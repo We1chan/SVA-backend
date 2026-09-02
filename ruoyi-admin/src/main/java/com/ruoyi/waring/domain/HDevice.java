@@ -26,6 +26,13 @@ public class HDevice extends BaseEntity {
     private String play_url;
     private String zlm_proxy_key;
 
+    /** 设备类型镜像列（GB28181/RTSP 等），由 GB28181 目录同步写入，供告警 JOIN 与布控分流使用。 */
+    private String device_type;
+    /** GB28181 平台/目录标识（目录同步镜像）。 */
+    private String gb_platform_id;
+    /** 数据来源（如 GB28181 目录）。 */
+    private String sync_source;
+
     // 流媒体协议组：WVP 目录标识、当前点播会话以及最近一次同步时间。
     private String gb_device_id;
     private String gb_channel_id;

@@ -5,6 +5,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.service.Gb28181SyncService;
 import com.ruoyi.waring.service.HDeviceService;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,7 +40,7 @@ import java.util.Map;
 public class HDeviceController extends BaseController {
 
     @Autowired
-    private HDeviceService hDeviceService;
+    HDeviceService hDeviceService;
 
     @Autowired
     private Gb28181SyncService gb28181SyncService;
@@ -188,6 +190,27 @@ public class HDeviceController extends BaseController {
     @GetMapping("/monitor/{apeId}/preview")
     public AjaxResult previewMonitor(@PathVariable String apeId) {
         return success(hDeviceService.previewMonitor(apeId));
+    }
+
+    /**
+     * 同步 SIP/GB 平台目录为业务设备（仅管理员）。请求体缺失（{@code null}）表示未提供
+     * 快照，接口不做任何对账；显式 {@code []} 表示权威空目录，会将该 ZLM 节点既有 GB
+     * 通道对账为离线。
+     */
+    @PreAuthorize("@ss.hasRole('admin')")
+    @PostMapping("/gb28181/catalog/sync")
+    public AjaxResult gb28181CatalogSync(@RequestParam(defaultValue = "1") Long zlmServerId,
+                                         @RequestBody(required = false) List<Gb28181Channel> channels) {
+        return success(hDeviceService.syncGb28181Catalog(zlmServerId, channels));
+    }
+
+    /**
+     * 刷新 GB28181 媒体可用性与设备在线状态（仅管理员）
+     */
+    @PreAuthorize("@ss.hasRole('admin')")
+    @PostMapping("/gb28181/status/refresh")
+    public AjaxResult gb28181StatusRefresh(@RequestParam(defaultValue = "1") Long zlmServerId) {
+        return success(hDeviceService.refreshGb28181Status(zlmServerId));
     }
 
     private AjaxResult buildMonitorActionResult(boolean success, String action, String shortMessage, HDevice device) {
