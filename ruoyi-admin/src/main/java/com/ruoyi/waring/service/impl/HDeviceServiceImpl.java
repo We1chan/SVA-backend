@@ -517,8 +517,13 @@ public class HDeviceServiceImpl implements HDeviceService {
             throw new ServiceException("设备不存在: " + apeId);
         }
 
-        String previewAddProxyUrl = buildDirectAddProxyUrl(device);
         String previewPlayUrl = device.getPlay_url();
+        if (isDirectDevice(device) && StringUtils.startsWithIgnoreCase(previewPlayUrl, "rtsp://")) {
+            String directPlayUrl = buildDirectPlayUrl(device);
+            if (StringUtils.isNotBlank(directPlayUrl)) {
+                previewPlayUrl = directPlayUrl;
+            }
+        }
         if (StringUtils.isBlank(previewPlayUrl)) {
             previewPlayUrl = buildDirectPlayUrl(device);
         }

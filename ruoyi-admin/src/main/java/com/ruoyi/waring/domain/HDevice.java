@@ -19,6 +19,12 @@ public class HDevice extends BaseEntity {
     private String direct_source_url;
     private String play_url;
     private String zlm_proxy_key;
+    private String device_type;
+    private String gb_device_id;
+    private String gb_platform_id;
+    private String gb_channel_id;
+    private java.util.Date last_seen_at;
+    private String sync_source;
     private String resource_type;
     private String sub_type;
     @Excel(name = "IP地址")

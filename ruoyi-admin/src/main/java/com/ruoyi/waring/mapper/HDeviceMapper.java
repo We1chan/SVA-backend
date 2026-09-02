@@ -18,6 +18,14 @@ public interface HDeviceMapper {
 
     HDevice selectDeviceByApeId(String apeId);
 
+    HDevice selectGbDevice(@Param("zlmServerId") Long zlmServerId,
+                           @Param("gbDeviceId") String gbDeviceId,
+                           @Param("gbChannelId") String gbChannelId);
+
+    int upsertGbDevice(HDevice device);
+
+    int markGbDevicesOffline(@Param("zlmServerId") Long zlmServerId);
+
     int insertDeviceCrud(HDevice device);
 
     int updateDevice(HDevice device);
