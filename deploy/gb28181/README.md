@@ -51,9 +51,20 @@ bash deploy/gb28181/scripts/regression.sh
 
 脚本会依次检查 shell/systemd 配置、重复执行数据库迁移、运行 Java 单元测试、检查 WVP/ZLM/easySVA 服务，并用 `ffprobe` 验证原有 RTSP 流。如果本机使用其他回归流，可通过 `RTSP_REGRESSION_URL` 覆盖默认地址。WVP 点播超时固定为 18 秒，easySVA 后端读取超时为 20 秒，均低于现有浏览器请求的 23 秒，避免页面先超时而后台仍继续点播。
 
+## 软件模拟器接入与验收
+
+没有实体相机时，可以使用 `sbgb28181` 在 Ubuntu 22.04/WSL 中模拟一台完整的 GB28181 设备。它会完成 SIP REGISTER/401 Digest、心跳、目录上报、INVITE/BYE，并把 GStreamer 测试画面封装为 PS/H.264 RTP 推给 WVP/ZLMediaKit。
+
+1. 按 [`acceptance-software-simulator.md`](acceptance-software-simulator.md) 安装依赖并锁定已验证的模拟器版本。
+2. 运行 `bash deploy/gb28181/scripts/simulator-start.sh`。脚本只在模拟器目录本地编译 GStreamer 插件，不做全局安装；设备注册后会自动将 WVP 媒体传输设为 UDP。
+3. 运行 `device-check.ps1`，再在 easySVA 设备页点击“启动监控”和“预览视频”。
+4. `Ctrl+C` 停止模拟器可验证离线同步；重新运行脚本可验证恢复上线。
+
+模拟器的环境变量、预期结果、API 与 `ffprobe` 复验方法见软件模拟验收文档。
+
 ## 实体 IPC 接入与验收
 
-本仓库已完成平台侧的 WVP、ZLMediaKit 和 easySVA 同步逻辑；真正完成设备接入仍需要一台支持 GB28181 的 IPC 与本机处于同一局域网。
+本仓库已完成平台侧的 WVP、ZLMediaKit 和 easySVA 同步逻辑。如果学校要求额外使用硬件复验，可再将一台支持 GB28181 的 IPC 与本机放在同一局域网，按下列参数接入。
 
 1. 先运行 `bash deploy/gb28181/scripts/health.sh`。其中 `WVP HTTP`、`SIP TCP`、`SIP UDP`、`GB ZLM HTTP` 和 `GB ZLM RTSP` 必须均为 `OK`。
 2. 以管理员身份运行 `open-firewall.ps1`，允许局域网访问 SIP、WebSocket 预览、RTSP 和 RTP 端口：
@@ -84,4 +95,4 @@ bash deploy/gb28181/scripts/regression.sh
 
 如果第 4 步持续显示 `0` 台设备，应优先核对 IPC 是否和电脑处于同一子网、SIP IP/端口/平台 ID/密码是否完全匹配，以及 Windows 防火墙规则是否已成功添加。
 
-实体 IPC 验收完成时，应保存以下证据：设备注册与在线状态、通道目录、启动点播后的 WVP 返回值、ZLM 中的 `rtp` 流、easySVA 设备页预览、设备断电后的离线状态，以及一台原有 DIRECT/RTSP 设备的预览结果。没有实体 IPC 或符合 GB28181 的模拟器时，只能确认平台侧和 RTSP 回归通过，不能把 SIP 注册与 PS-RTP 实机链路标记为已验收。
+实体 IPC 验收完成时，应保存以下证据：设备注册与在线状态、通道目录、启动点播后的 WVP 返回值、ZLM 中的 `rtp` 流、easySVA 设备页预览、设备断电后的离线状态，以及一台原有 DIRECT/RTSP 设备的预览结果。没有实体 IPC 或符合 GB28181 的软件模拟器时，只能确认平台侧和 RTSP 回归通过，不能把 SIP 注册与 PS-RTP 链路标记为已验收。
