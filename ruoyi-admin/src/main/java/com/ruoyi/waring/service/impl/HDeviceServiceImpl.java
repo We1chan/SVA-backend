@@ -36,6 +36,12 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 
+/**
+ * 统一设备业务服务。
+ *
+ * <p>共享模块：保留 DIRECT/PLATFORM 原有行为，并在监控启停与预览入口中按
+ * stream_source_type 分派 GB28181 点播流程。</p>
+ */
 @Service
 @Component
 public class HDeviceServiceImpl implements HDeviceService {
@@ -468,6 +474,7 @@ public class HDeviceServiceImpl implements HDeviceService {
         String startPlayUrl = buildDirectPlayUrl(existedDevice);
         boolean gbPlaybackStarted = false;
         if (isGb28181Device(existedDevice)) {
+            // GB28181 必须先由 WVP 确认在线，再发起 INVITE；DIRECT 流仍走原代理逻辑。
             if (!"1".equals(existedDevice.getIs_online())) {
                 throw new ServiceException("GB28181 设备当前离线，无法点播");
             }
@@ -484,6 +491,7 @@ public class HDeviceServiceImpl implements HDeviceService {
                     throw new ServiceException("保存 GB28181 点播地址失败: " + apeId);
                 }
             } catch (RuntimeException ex) {
+                // WVP 会话已建立但本地保存失败时立即 BYE，避免遗留无人使用的 RTP 会话。
                 stopGb28181PlaybackQuietly(existedDevice, "保存点播地址失败后回收 WVP 会话");
                 throw ex;
             }
@@ -542,6 +550,7 @@ public class HDeviceServiceImpl implements HDeviceService {
             try {
                 gb28181PlaybackService.stop(existedDevice.getGb_device_id(), existedDevice.getGb_channel_id());
             } catch (Exception e) {
+                // 即使 WVP 已无会话，也继续清理本地状态，使“停止监控”具备幂等效果。
                 log.warn("停止 WVP 国标点播失败，继续清理平台状态, apeId={}, message={}", apeId, e.getMessage());
             }
         } else if (isDirectDevice(existedDevice) && StringUtils.isNotBlank(existedDevice.getZlm_proxy_key())) {
@@ -581,6 +590,7 @@ public class HDeviceServiceImpl implements HDeviceService {
 
         String previewPlayUrl;
         if (isGb28181Device(device)) {
+            // 国标预览只能使用本次 INVITE 生成的地址，不回退到 DIRECT 源地址。
             if (!"1".equals(device.getIs_online())) {
                 throw new ServiceException("GB28181 设备当前离线，无法预览");
             }

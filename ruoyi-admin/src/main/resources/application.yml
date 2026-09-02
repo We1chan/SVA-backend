@@ -22,7 +22,7 @@ h3:
 hy:
   opc-address: opc.tcp://127.0.0.1:49310
 
-# GB28181 device synchronization (WVP handles SIP, ZLMediaKit handles media)
+# 流媒体协议组 / GB28181：WVP 负责 SIP 与目录，独立 ZLMediaKit 负责媒体，后端只做同步与点播编排。
 gb28181:
   enabled: ${GB28181_ENABLED:true}
   wvp-base-url: ${GB28181_WVP_BASE_URL:http://127.0.0.1:18080}

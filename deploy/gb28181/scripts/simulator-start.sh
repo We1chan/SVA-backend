@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 模块：流媒体协议组 / 软件相机验收。
+# 启动锁定版本的 sbgb28181，以测试画面覆盖 SIP 注册、目录、INVITE、PS-RTP 和 BYE 全链路。
 set -euo pipefail
 
 backend_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -74,6 +76,7 @@ configure_udp_media() {
   return 0
 }
 
+# 注册可能晚于进程启动，因此并行轮询 WVP，在设备出现后把验收传输固定为 UDP。
 configure_udp_media &
 transport_pid=$!
 cleanup() {

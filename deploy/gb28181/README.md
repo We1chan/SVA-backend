@@ -2,6 +2,9 @@
 
 本模块只负责流媒体组的本地基础设施，不修改 easySVA 原有 RTSP、分析器或前端链路。
 
+跨仓库的数据流、代码入口和维护边界见
+[流媒体协议组代码地图](https://github.com/We1chan/FWWsva/blob/master/docs/gb28181-code-map.md)。
+
 ## 服务边界
 
 - WVP-PRO：GB28181 SIP 注册、心跳、目录查询和 INVITE。

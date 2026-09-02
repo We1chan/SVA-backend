@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 模块：流媒体协议组 / WVP 本地启动器。
+# 自动定位构建产物与本机可达地址，再以隔离配置启动 SIP/API 服务。
 set -euo pipefail
 
 backend_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -10,6 +12,7 @@ if [[ -z "$jar_file" || ! -f "$jar_file" ]]; then
   exit 1
 fi
 
+# SIP/SDP 必须公布设备可达的地址，不能固定为仅主机可用的 127.0.0.1。
 host_ip="$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -n 1)"
 if [[ -z "$host_ip" ]]; then
   host_ip="$(hostname -I | awk '{print $1}')"

@@ -30,6 +30,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * 将 WVP 的 GB28181 设备目录同步为 easySVA 的通道级设备记录。
+ *
+ * <p>模块：流媒体协议组 / 设备同步与在线状态。同步采用完整快照语义：先读取
+ * WVP，再在同一事务内更新本地状态；DIRECT/PLATFORM 设备不会被本服务修改。</p>
+ */
 @Service
 public class Gb28181SyncServiceImpl implements Gb28181SyncService {
 
@@ -81,10 +87,12 @@ public class Gb28181SyncServiceImpl implements Gb28181SyncService {
             String syncTime = DateUtils.getTime();
             SyncSnapshot snapshot = fetchSnapshot(syncTime);
 
+            // 快照中缺失的旧通道应视为离线：先统一离线，再用本轮快照恢复实际状态。
             hDeviceMapper.markAllGb28181DevicesOffline();
             for (HDevice device : snapshot.channels) {
                 hDeviceMapper.upsertGb28181Device(device);
             }
+            // 离线通道的旧播放 URL 已失效，必须清除，避免前端或分析器继续使用陈旧会话。
             hDeviceMapper.clearOfflineGb28181Playback();
 
             Map<String, Object> result = new LinkedHashMap<>();
@@ -129,6 +137,7 @@ public class Gb28181SyncServiceImpl implements Gb28181SyncService {
             PageData channelPage = fetchPage(buildChannelsUri(parentDeviceId, pageNumber));
             for (JsonNode channel : channelPage.items) {
                 Integer channelType = integer(channel, "channelType");
+                // WVP 的非零 channelType 表示非视频通道，不应作为摄像机写入设备表。
                 if (channelType != null && channelType != 0) {
                     snapshot.skippedChannelCount++;
                     continue;
@@ -255,6 +264,7 @@ public class Gb28181SyncServiceImpl implements Gb28181SyncService {
 
     private String buildApeId(String deviceId, String channelId) {
         String source = deviceId + ":" + channelId;
+        // 同一国标设备/通道始终映射到同一个 ape_id，保证重复同步不会制造重复设备。
         UUID stableId = UUID.nameUUIDFromBytes(source.getBytes(StandardCharsets.UTF_8));
         return "GB_" + stableId.toString().replace("-", "");
     }

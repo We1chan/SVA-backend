@@ -1,3 +1,7 @@
+<#
+模块：流媒体协议组 / 设备注册检查。
+职责：读取 WVP 设备目录并展示 SIP 目标，供实体相机或软件模拟器验收使用。
+#>
 [CmdletBinding()]
 param(
     [string]$WvpBaseUrl = 'http://127.0.0.1:18080',

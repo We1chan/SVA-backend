@@ -30,6 +30,12 @@ import java.util.List;
 import java.util.Map;
 import com.ruoyi.system.domain.DeploymentTaskAlgorithm;
 
+/**
+ * easySVA 后端与分析器之间的任务编排客户端。
+ *
+ * <p>共享模块：DIRECT 设备使用原 ZLMediaKit 路径；GB28181 设备仅在在线且已
+ * 点播时传递 WVP/ZLMediaKit 生成的 RTSP 地址。</p>
+ */
 @Service
 public class DeploymentAnalyzerClient
 {
@@ -514,6 +520,7 @@ public class DeploymentAnalyzerClient
         String zlmApp = StringUtils.isBlank(zlmServer.getApp()) ? DEFAULT_ZLM_APP : zlmServer.getApp().trim();
         String svaApp = StringUtils.isBlank(svaServer.getApp()) ? DEFAULT_SVA_APP : svaServer.getApp().trim();
         boolean gb28181 = "GB28181".equalsIgnoreCase(device.getStream_source_type());
+        // 国标分析只能消费当前在线点播产生的 RTSP 地址；DIRECT 设备仍按原 ZLM 路径拼接。
         String sourceStreamUrl = gb28181 && "1".equals(device.getIs_online())
             ? device.getGb_stream_url() : null;
         Integer rtmpPort = zlmServer.getMedia_rtmp_port();

@@ -4,6 +4,12 @@ import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.common.core.domain.BaseEntity;
 import lombok.*;
 
+/**
+ * easySVA 统一设备模型。
+ *
+ * <p>共享模块：同时承载 DIRECT、PLATFORM 与 GB28181 设备；新增协议字段必须
+ * 保持可空，避免破坏原有 RTSP 设备数据。</p>
+ */
 @Data
 @Getter
 @Setter
@@ -19,6 +25,8 @@ public class HDevice extends BaseEntity {
     private String direct_source_url;
     private String play_url;
     private String zlm_proxy_key;
+
+    // 流媒体协议组：WVP 目录标识、当前点播会话以及最近一次同步时间。
     private String gb_device_id;
     private String gb_channel_id;
     private String gb_media_server_id;

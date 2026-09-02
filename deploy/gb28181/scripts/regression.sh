@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 模块：流媒体协议组 / 自动回归。
+# 串联静态检查、幂等迁移、后端测试、服务健康与原 RTSP 兼容性验证。
 set -euo pipefail
 
 backend_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
