@@ -1,3 +1,4 @@
+-- Module: streaming protocol group / GB28181 device model.
 -- Idempotent MySQL migration for the GB28181 device model. Existing DIRECT
 -- and PLATFORM rows are preserved, and the file may be executed repeatedly.
 

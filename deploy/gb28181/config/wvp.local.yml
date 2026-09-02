@@ -1,3 +1,5 @@
+# 模块：流媒体协议组 / GB28181 信令服务。
+# 职责：配置 WVP 的 SIP 注册、设备目录 API 以及独立 ZLMediaKit 连接；不配置 easySVA 原有 RTSP 服务。
 spring:
   application:
     name: easysva-wvp

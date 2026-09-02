@@ -1,4 +1,8 @@
 #Requires -RunAsAdministrator
+<#
+模块：流媒体协议组 / Windows 与 WSL 网络接入。
+职责：仅向 LocalSubnet 开放 SIP、RTP 和预览端口，并兼容 WSL mirrored 网络的 Hyper-V 防火墙。
+#>
 $ErrorActionPreference = 'Stop'
 
 $vmCreatorId = '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}'

@@ -1,3 +1,5 @@
+# 模块：流媒体协议组 / GB28181 独立媒体服务。
+# 与原有 ZLMediaKit 使用不同配置、端口和日志，避免破坏 DIRECT/RTSP 链路。
 [Unit]
 Description=easySVA GB28181 ZLMediaKit
 After=network.target

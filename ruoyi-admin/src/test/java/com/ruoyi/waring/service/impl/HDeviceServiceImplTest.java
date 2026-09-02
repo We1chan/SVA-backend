@@ -19,6 +19,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/** 验证 GB28181 点播生命周期与原 DIRECT 设备流程之间的隔离。 */
 class HDeviceServiceImplTest {
 
     private HDeviceServiceImpl service;

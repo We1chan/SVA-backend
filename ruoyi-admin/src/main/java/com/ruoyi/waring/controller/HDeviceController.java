@@ -27,6 +27,12 @@ import java.util.List;
 import java.util.Map;
 
 
+/**
+ * 统一设备管理接口。
+ *
+ * <p>共享模块：为 DIRECT、PLATFORM 与 GB28181 提供一致的列表、同步、监控启停
+ * 和预览入口；具体协议行为由服务层按流源类型分派。</p>
+ */
 @RestController
 @RequestMapping("/waring/device")
 public class HDeviceController extends BaseController {

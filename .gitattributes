@@ -1,0 +1,4 @@
+# Cross-platform deployment files must keep the line endings required by their runtime.
+*.sh      text eol=lf
+*.service text eol=lf
+*.ps1     text eol=crlf

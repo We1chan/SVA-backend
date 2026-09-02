@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/** 验证分析器只在国标通道在线且已点播时消费 WVP/ZLM RTSP 地址。 */
 class DeploymentAnalyzerClientTest {
 
     private DeploymentAnalyzerClient client;

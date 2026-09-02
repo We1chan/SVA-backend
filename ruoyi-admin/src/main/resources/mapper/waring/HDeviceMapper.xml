@@ -2,6 +2,11 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ruoyi.waring.mapper.HDeviceMapper">
 
+    <!--
+      共享设备映射：DIRECT、PLATFORM 与 GB28181 共用 h_device。
+      国标字段保持可空，协议专用写操作均限制 stream_source_type='GB28181'。
+    -->
+
     <resultMap type="com.ruoyi.waring.domain.HDevice" id="HDeviceResult">
         <result property="ape_id" column="ape_id"/>
         <result property="name" column="name"/>
@@ -146,6 +151,7 @@
         WHERE ape_id = #{apeId}
     </update>
 
+    <!-- GB28181 完整快照同步：预置离线 -> upsert 当前通道 -> 清理离线会话。 -->
     <update id="markAllGb28181DevicesOffline">
         UPDATE h_device
         SET is_online = '0',

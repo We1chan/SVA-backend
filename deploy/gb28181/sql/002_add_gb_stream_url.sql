@@ -1,3 +1,4 @@
+-- Module: streaming protocol group / GB28181 analyzer input.
 -- Run after 001_extend_h_device.sql. This idempotent migration stores the
 -- active RTSP route returned by WVP for consumption by sva-server.
 

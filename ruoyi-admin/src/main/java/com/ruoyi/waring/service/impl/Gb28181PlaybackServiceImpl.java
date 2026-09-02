@@ -17,6 +17,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 
+/**
+ * 通过 WVP HTTP API 管理 GB28181 实时点播。
+ *
+ * <p>模块：流媒体协议组 / GB28181 取流适配。输入为国标设备与通道编号，
+ * 输出为 WVP/ZLMediaKit 建立会话后生成的播放地址；本类不直接发送 SIP 信令。</p>
+ */
 @Service
 public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
 
@@ -47,6 +53,7 @@ public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
         JsonNode data = request(buildUri("start", deviceId, channelId), "开始国标点播");
 
         String streamId = text(data, "stream");
+        // 浏览器优先使用低延迟 WebSocket-FLV；不可用时按播放器兼容性依次降级。
         String playUrl = firstNotBlank(text(data, "ws_flv"), text(data, "flv"),
                 text(data, "ws_fmp4"), text(data, "fmp4"), text(data, "hls"));
         String rtspUrl = text(data, "rtsp");
@@ -87,6 +94,7 @@ public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
 
     private JsonNode unwrap(JsonNode response, String action) {
         JsonNode current = response;
+        // WVP 不同版本可能返回一层或多层 {code, data} 包装，限制三层避免异常响应无限下钻。
         for (int level = 0; level < 3; level++) {
             if (!current.has("code")) {
                 return current;

@@ -1,3 +1,5 @@
+# 模块：流媒体协议组 / GB28181 信令服务。
+# WVP 在独立 ZLMediaKit 就绪后启动，负责 SIP 注册、目录与点播调度。
 [Unit]
 Description=easySVA GB28181 WVP Signaling Platform
 After=network-online.target mysql.service redis-server.service easysva-gb-media.service

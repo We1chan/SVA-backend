@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+/** 验证 WVP 点播响应解包、播放地址选择和错误传播契约。 */
 class Gb28181PlaybackServiceImplTest {
 
     private Gb28181PlaybackServiceImpl service;

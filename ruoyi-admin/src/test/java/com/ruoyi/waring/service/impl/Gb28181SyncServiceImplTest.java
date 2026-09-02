@@ -18,6 +18,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+/** 验证 WVP 设备/通道快照到 h_device 的同步与在线状态契约。 */
 class Gb28181SyncServiceImplTest {
 
     private Gb28181SyncServiceImpl service;
