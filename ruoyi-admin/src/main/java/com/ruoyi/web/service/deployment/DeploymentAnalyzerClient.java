@@ -72,6 +72,11 @@ public class DeploymentAnalyzerClient
 
         String apeId = task.getDeviceId();
         String streamUrl = buildStreamUrl(bindingConfig, apeId);
+        if (StringUtils.isEmpty(streamUrl))
+        {
+            return AnalyzerResult.fail("设备无可播放媒体流（GB28181设备离线或媒体未同步）",
+                "buildStreamUrl返回空: deviceId=" + apeId + ", deviceType=" + resolveDeviceType(apeId));
+        }
 
         boolean pushStream = Boolean.TRUE.equals(task.getPushEnabled());
         boolean frontendOverlayEnabled = Boolean.TRUE.equals(task.getFrontendOverlayEnabled());
@@ -488,7 +493,77 @@ public class DeploymentAnalyzerClient
         {
             return null;
         }
+        HDevice device = hDeviceMapper.selectDeviceByApeId(apeId);
+        if (device != null && isGb28181Device(device))
+        {
+            // GB28181 通道以 ZLM 中显式绑定的媒体流为准（见 gb28181_channel），
+            // play_url 形如 ws://host:port/live/<stream>.live.flv，据此解析 app/stream，
+            // 不能按 RTSP 惯例用 ape_id 作为流名（ZLM 中不存在该流名，拉流必失败）。
+            String mediaRef = extractZlmMediaRef(device.getPlay_url());
+            if (mediaRef == null)
+            {
+                log.warn("GB28181设备缺少可解析的play_url, 无法构建analyzer拉流地址, deviceId={}", apeId);
+                return null;
+            }
+            return "rtsp://" + config.zlmHost + ":" + config.zlmMediaRtspPort + "/" + mediaRef;
+        }
         return "rtsp://" + config.zlmHost + ":" + config.zlmMediaRtspPort + "/" + config.zlmApp + "/" + apeId;
+    }
+
+    private boolean isGb28181Device(HDevice device)
+    {
+        return device != null && device.getDevice_type() != null
+            && "GB28181".equalsIgnoreCase(device.getDevice_type().trim());
+    }
+
+    private String resolveDeviceType(String apeId)
+    {
+        if (StringUtils.isBlank(apeId))
+        {
+            return "";
+        }
+        HDevice device = hDeviceMapper.selectDeviceByApeId(apeId);
+        return device == null ? "" : String.valueOf(device.getDevice_type());
+    }
+
+    /**
+     * 从 ZLM play_url（ws://host:port/live/stream.live.flv）解析出 "app/stream" 媒体引用。
+     */
+    private String extractZlmMediaRef(String playUrl)
+    {
+        if (StringUtils.isBlank(playUrl))
+        {
+            return null;
+        }
+        String rest = playUrl.trim();
+        int scheme = rest.indexOf("://");
+        if (scheme >= 0)
+        {
+            rest = rest.substring(scheme + 3);
+        }
+        int slash = rest.indexOf('/');
+        if (slash < 0)
+        {
+            return null;
+        }
+        String path = rest.substring(slash + 1);
+        while (path.endsWith("/"))
+        {
+            path = path.substring(0, path.length() - 1);
+        }
+        if (path.endsWith(".live.flv"))
+        {
+            path = path.substring(0, path.length() - ".live.flv".length());
+        }
+        else if (path.endsWith(".flv"))
+        {
+            path = path.substring(0, path.length() - ".flv".length());
+        }
+        if (path.isEmpty())
+        {
+            return null;
+        }
+        return path;
     }
 
     private String buildPushStreamUrl(BindingConfig config, String deploymentId)
