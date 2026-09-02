@@ -72,7 +72,13 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
             throw new ServiceException("ZLM 节点不存在或未启用: " + zlmServerId);
         }
 
-        List<Gb28181Channel> incoming = channels == null ? Collections.<Gb28181Channel>emptyList() : channels;
+        if (channels == null) {
+            // 未携带目录快照（如设备管理页“同步国标设备”按钮仅触发对账）：不新增、
+            // 不更新、不剔除任何通道，保持现状；真正的目录下发必须携带权威快照。
+            return new DeviceSyncResult();
+        }
+
+        List<Gb28181Channel> incoming = channels;
         for (Gb28181Channel channel : incoming) {
             validateCatalogChannel(channel);
             if (!zlmServerId.equals(channel.getZlmServerId())) {

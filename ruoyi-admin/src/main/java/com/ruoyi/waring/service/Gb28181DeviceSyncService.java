@@ -13,9 +13,14 @@ public interface Gb28181DeviceSyncService {
     MediaRefreshResult refreshMediaFromZlm(Long zlmServerId);
 
     /**
-     * Sync a SIP/GB catalog snapshot onto one ZLM node: upsert the authoritative
-     * catalog rows, mirror GB28181 devices into h_device (idempotent), and mark
-     * previously catalogued channels that disappeared from this snapshot offline.
+     * Reconcile a SIP/GB catalog snapshot onto one ZLM node. A {@code null}
+     * {@code channels} value means no snapshot was supplied and is a no-op;
+     * an explicit empty list is an authoritative empty snapshot and marks all
+     * previously catalogued channels for the node offline.
+     *
+     * <p>A non-null snapshot upserts its catalog rows, mirrors GB28181 devices
+     * into {@code h_device} idempotently, and marks channels absent from the
+     * snapshot offline.</p>
      */
     DeviceSyncResult syncDevices(Long zlmServerId, List<Gb28181Channel> channels);
 

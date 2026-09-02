@@ -33,6 +33,12 @@ public interface HDeviceService {
 
     Map<String, Object> previewMonitor(String apeId);
 
+    /**
+     * Reconcile the authoritative SIP/GB catalog snapshot for a ZLM node.
+     * A {@code null} list means no snapshot and performs no reconciliation;
+     * an explicit empty list is authoritative and reconciles existing GB
+     * channels offline.
+     */
     Map<String, Object> syncGb28181Catalog(Long zlmServerId, List<Gb28181Channel> channels);
 
     Map<String, Object> refreshGb28181Status(Long zlmServerId);

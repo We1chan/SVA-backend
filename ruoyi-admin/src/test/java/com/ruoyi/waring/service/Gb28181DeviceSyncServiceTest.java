@@ -142,6 +142,45 @@ public class Gb28181DeviceSyncServiceTest {
         assertEquals("RUNNING", devices.updated.getMonitor_status());
     }
 
+    @Test
+    public void syncDevicesWithoutSnapshotReturnsZeroesAndKeepsState() {
+        RecordingCatalogMapper catalog = new RecordingCatalogMapper();
+        catalog.seed(channel());
+        DeviceMirror devices = new DeviceMirror(null);
+        Gb28181DeviceSyncService service = new Gb28181DeviceSyncServiceImpl(
+            catalog, mapper(ZlmServerMapper.class, "selectEnabledById", zlmServer()),
+            devices.proxy(), null);
+
+        Gb28181DeviceSyncService.DeviceSyncResult result = service.syncDevices(1L, null);
+
+        assertEquals(0, result.getCreated());
+        assertEquals(0, result.getUpdated());
+        assertEquals(0, result.getOfflineMarked());
+        assertEquals(0, catalog.catalogUpserts);
+        assertEquals(0, devices.offlineUpdates.size());
+        assertEquals(0, devices.onlineUpdates.size());
+    }
+
+    @Test
+    public void syncDevicesWithExplicitEmptySnapshotMarksPreviouslyCatalogedChannelsOffline() {
+        RecordingCatalogMapper catalog = new RecordingCatalogMapper();
+        catalog.seed(channel());
+        DeviceMirror devices = new DeviceMirror(null);
+        Gb28181DeviceSyncService service = new Gb28181DeviceSyncServiceImpl(
+            catalog, mapper(ZlmServerMapper.class, "selectEnabledById", zlmServer()),
+            devices.proxy(), null);
+
+        Gb28181DeviceSyncService.DeviceSyncResult result = service.syncDevices(1L, Collections.emptyList());
+
+        assertEquals(0, result.getCreated());
+        assertEquals(0, result.getUpdated());
+        assertEquals(1, result.getOfflineMarked());
+        assertEquals(1, devices.offlineUpdates.size());
+        assertEquals("34020000001310000001", devices.offlineUpdates.get(0)[2]);
+        assertEquals("2", devices.offlineUpdates.get(0)[3]);
+        assertEquals(0, catalog.catalogUpserts);
+    }
+
     private Gb28181Channel channel() {
         return channelWithChannelId("34020000001310000001");
     }

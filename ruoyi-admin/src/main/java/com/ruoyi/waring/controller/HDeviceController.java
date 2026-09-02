@@ -174,7 +174,9 @@ public class HDeviceController extends BaseController {
     }
 
     /**
-     * 同步 SIP/GB 平台目录为业务设备（仅管理员）
+     * 同步 SIP/GB 平台目录为业务设备（仅管理员）。请求体缺失（{@code null}）表示未提供
+     * 快照，接口不做任何对账；显式 {@code []} 表示权威空目录，会将该 ZLM 节点既有 GB
+     * 通道对账为离线。
      */
     @PreAuthorize("@ss.hasRole('admin')")
     @PostMapping("/gb28181/catalog/sync")
