@@ -11,7 +11,9 @@ public class Details {
     private String alarm_level_name;
     private String alarm_type_name;
     private String alarm_time;
+    private String device_id;
     private String device_name;
+    private String device_type;
     private Integer is_handle;
     private String h_title;
     private String h_create_time;

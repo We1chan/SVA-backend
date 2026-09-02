@@ -738,7 +738,9 @@
         SELECT h_waring.alarm_level_name,
                h_waring.alarm_type_name,
                h_waring.alarm_time,
+               h_waring.device_id,
                h_waring.device_name,
+               hd.device_type AS device_type,
                h_waring.is_handle,
                 h_waring.sva_event_state,
                 h_waring.sva_behavior_type,
@@ -818,6 +820,7 @@
                                  )
                                  LIMIT 1) AS ai_review_time
         FROM h_waring
+        LEFT JOIN h_device hd ON hd.ape_id = h_waring.device_id
         WHERE h_waring.w_id = #{w_id}
     </select>
 
