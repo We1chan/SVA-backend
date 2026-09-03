@@ -234,17 +234,18 @@
 
     <insert id="upsertGb28181Device" parameterType="HDevice">
         INSERT INTO h_device
-        (ape_id, name, stream_source_type, gb_device_id, gb_channel_id, gb_media_server_id,
+        (ape_id, name, device_type, stream_source_type, gb_device_id, gb_channel_id, gb_media_server_id,
          gb_stream_id, gb_last_sync_time, resource_type, ip_addr, port, org_index, org_name,
          place_code, place, is_online, producer, producer_name, parent_code, zlm_server_id,
          sva_server_id, monitor_status, create_time, update_time)
         VALUES
-        (#{ape_id}, #{name}, 'GB28181', #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id},
+        (#{ape_id}, #{name}, 'GB28181', 'GB28181', #{gb_device_id}, #{gb_channel_id}, #{gb_media_server_id},
          #{gb_stream_id}, #{gb_last_sync_time}, #{resource_type}, #{ip_addr}, #{port}, #{org_index},
          #{org_name}, #{place_code}, #{place}, #{is_online}, #{producer}, #{producer_name},
          #{parent_code}, 1, 1, 'STOPPED', #{create_time}, #{update_time})
         ON DUPLICATE KEY UPDATE
             name = VALUES(name),
+            device_type = 'GB28181',
             stream_source_type = 'GB28181',
             gb_device_id = VALUES(gb_device_id),
             gb_channel_id = VALUES(gb_channel_id),

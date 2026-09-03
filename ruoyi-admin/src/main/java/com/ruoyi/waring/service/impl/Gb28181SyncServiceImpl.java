@@ -174,6 +174,7 @@ public class Gb28181SyncServiceImpl implements Gb28181SyncService {
         device.setApe_id(buildApeId(parentDeviceId, channelId));
         device.setName(firstNotBlank(text(channel, "name", "gbName"),
                 text(parentDevice, "name"), channelId));
+        device.setDevice_type(SOURCE_TYPE_GB28181);
         device.setStream_source_type(SOURCE_TYPE_GB28181);
         device.setGb_device_id(parentDeviceId);
         device.setGb_channel_id(channelId);

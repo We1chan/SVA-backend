@@ -64,6 +64,7 @@ class Gb28181SyncServiceImplTest {
         ArgumentCaptor<HDevice> captor = ArgumentCaptor.forClass(HDevice.class);
         verify(mapper).upsertGb28181Device(captor.capture());
         HDevice device = captor.getValue();
+        assertEquals("GB28181", device.getDevice_type());
         assertEquals("GB28181", device.getStream_source_type());
         assertEquals("34020000001320000001", device.getGb_device_id());
         assertEquals("34020000001310000001", device.getGb_channel_id());
