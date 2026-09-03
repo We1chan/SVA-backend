@@ -362,6 +362,12 @@ public class DeploymentAnalyzerClient
             {
                 return AnalyzerResult.ok(shortMessage, body);
             }
+            // analyzer 重启后内存控制表会清空，此时取消一个已不存在的控制属于幂等成功：
+            // 目标状态（该布控不再运行）已经成立，数据库应收敛为 STOPPED，而不是卡在 RUNNING。
+            if (isIdempotentMissingControl(action, root))
+            {
+                return AnalyzerResult.ok(shortMessage, body);
+            }
             return AnalyzerResult.fail(shortMessage, body);
         }
         catch (ResourceAccessException ex)
@@ -448,7 +454,7 @@ public class DeploymentAnalyzerClient
             }
             if (code == 0 && "there is no such control".equals(normalizedMsg))
             {
-                return "未找到该布控，可能已停止或不存在";
+                return "停止成功，布控已取消";
             }
         }
 
@@ -457,6 +463,26 @@ public class DeploymentAnalyzerClient
             return "操作成功";
         }
         return StringUtils.isEmpty(msg) ? "操作失败" : msg;
+    }
+
+    /**
+     * 判定是否为「取消时控制已不存在」的幂等场景。
+     * 仅对 cancel 生效，且要求 code 是显式数字 0 —— 缺失 / null / 非数字的 code 仍按失败处理，
+     * 避免把畸形响应误判为成功。
+     */
+    private boolean isIdempotentMissingControl(String action, JsonNode root)
+    {
+        if (!"cancel".equals(normalizeText(action)))
+        {
+            return false;
+        }
+        JsonNode codeNode = root.path("code");
+        if (!codeNode.isNumber())
+        {
+            return false;
+        }
+        return codeNode.asInt() == 0
+            && "there is no such control".equals(normalizeText(root.path("msg").asText("")));
     }
 
     private String normalizeText(String text)
