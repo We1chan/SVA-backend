@@ -6,9 +6,15 @@ set -euo pipefail
 backend_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 workspace_root="$(dirname "$backend_root")"
 jar_file="$(find "$workspace_root/wvp-GB28181-pro/target" -maxdepth 1 -type f -name 'wvp-pro-*.jar' ! -name '*.original' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
+java_bin="${EASYSVA_JAVA21_BIN:-/usr/lib/jvm/java-21-openjdk-amd64/bin/java}"
 
 if [[ -z "$jar_file" || ! -f "$jar_file" ]]; then
   echo "WVP jar not found under $workspace_root/wvp-GB28181-pro/target." >&2
+  exit 1
+fi
+if [[ ! -x "$java_bin" ]]; then
+  echo "Java 21 is not executable: $java_bin" >&2
+  echo "Set EASYSVA_JAVA21_BIN when Java 21 is installed at another path." >&2
   exit 1
 fi
 
@@ -27,7 +33,8 @@ export WVP_DB_USERNAME="${WVP_DB_USERNAME:-wvp}"
 export WVP_DB_PASSWORD="${WVP_DB_PASSWORD:-easySVA.GB28181}"
 export GB28181_SIP_PASSWORD="${GB28181_SIP_PASSWORD:-admin123}"
 export GB28181_ZLM_SECRET="${GB28181_ZLM_SECRET:-easySVA.GB28181.ZLM}"
+export SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL:-jdbc:mysql://127.0.0.1:3307/wvp?useUnicode=true&characterEncoding=UTF8&rewriteBatchedStatements=true&serverTimezone=Asia/Shanghai&useSSL=false&allowMultiQueries=true&allowPublicKeyRetrieval=true}"
 
-exec /usr/lib/jvm/java-21-openjdk-amd64/bin/java -Xms256m -Xmx768m \
+exec "$java_bin" -Xms256m -Xmx768m \
   -jar "$jar_file" \
   --spring.config.location="file:$backend_root/deploy/gb28181/config/wvp.local.yml"

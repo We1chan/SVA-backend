@@ -63,6 +63,9 @@ npm run dev
 powershell -ExecutionPolicy Bypass -File deploy\gb28181\scripts\device-check.ps1
 ```
 
+如果 `wsl -l -q` 显示的发行版名称不是 `Ubuntu-22.04`，追加参数
+`-WslDistro <实际名称>`。
+
 通过标准：输出中设备 `44010200491320000001` 为在线，且存在通道 `44010200491320000002`。等待最多 15 秒后，easySVA 设备页应出现类型 `GB28181`、名称 `ch1`、状态“在线”的记录。
 
 ## 3. 验证点播和页面预览
