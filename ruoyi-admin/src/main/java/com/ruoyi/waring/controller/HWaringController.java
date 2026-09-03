@@ -494,6 +494,10 @@ public class HWaringController extends BaseController implements SvaDetectEventC
                 update.setPicture_url(imagePath);
                 update.setPicture_absolute_url(resolveMediaAbsoluteUrl(deploymentTask, device, imagePath));
             }
+            if (!videoPath.isEmpty()) {
+                update.setVideo_url(videoPath);
+                update.setVideo_absolute_url(resolveMediaAbsoluteUrl(deploymentTask, device, videoPath));
+            }
             if (!mediaStatus.isEmpty()) {
                 update.setSva_media_status(mediaStatus);
             }
@@ -693,6 +697,10 @@ public class HWaringController extends BaseController implements SvaDetectEventC
         if (!imagePath.isEmpty()) {
             update.setPicture_url(imagePath);
             update.setPicture_absolute_url(absoluteImageUrl);
+        }
+        if (!videoPath.isEmpty()) {
+            update.setVideo_url(videoPath);
+            update.setVideo_absolute_url(absoluteVideoUrl);
         }
         if (!mediaStatus.isEmpty()) {
             update.setSva_media_status(mediaStatus);
@@ -1240,6 +1248,10 @@ public class HWaringController extends BaseController implements SvaDetectEventC
 
     private String normalizeBehaviorType(String behaviorType) {
         String normalized = behaviorType == null ? "" : behaviorType.trim().toLowerCase(Locale.ROOT);
+        // Analyzer uses "sleep" internally; keep the public warning/filter contract stable.
+        if ("sleep".equals(normalized)) {
+            return SLEEP_DUTY_BEHAVIOR_TYPE;
+        }
         if ("cross_line".equals(normalized) || "enter_region".equals(normalized)
             || "exit_region".equals(normalized) || "dwell".equals(normalized)
             || "low_speed".equals(normalized) || "loitering".equals(normalized) || "absence".equals(normalized)
@@ -1382,8 +1394,18 @@ public class HWaringController extends BaseController implements SvaDetectEventC
      * 报警信息导出
      */
     @PostMapping("/importTemplate")
-    public void importTemplate(HttpServletResponse response, HWaring waring) {
-        List<HWaring> list = hWaringService.selectWaringList(waring, getUserId(), 1);
+    public void importTemplate(HttpServletResponse response, HWaring waring,
+                               @RequestParam(defaultValue = "all") String exportScope) {
+        List<HWaring> list;
+        if ("falseAlarm".equals(exportScope)) {
+            list = hWaringService.selectWubaoList(waring, getUserId(), false);
+        } else if ("recondition".equals(exportScope)) {
+            list = hWaringService.selectReconditionList(waring, getUserId(), false);
+        } else if ("all".equals(exportScope)) {
+            list = hWaringService.selectWaringList(waring, getUserId(), 1);
+        } else {
+            throw new IllegalArgumentException("未知告警导出范围");
+        }
         ExcelUtil<HWaring> util = new ExcelUtil<HWaring>(HWaring.class);
         util.exportExcel(response, list, "报警数据");
     }

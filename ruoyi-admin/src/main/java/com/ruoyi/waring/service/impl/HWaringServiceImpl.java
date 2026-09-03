@@ -1071,13 +1071,20 @@ public class HWaringServiceImpl implements HWaringService {
 
     @Override
     public List<HWaring> selectReconditionList(HWaring waring, Long userId) {
+        return selectReconditionList(waring, userId, true);
+    }
+
+    @Override
+    public List<HWaring> selectReconditionList(HWaring waring, Long userId, boolean paginate) {
         List<HWaring> warings;
         SysUser user = userMapper.selectUserById(userId);
         SysDept dept = sysDeptMapper.selectDeptById(user.getDeptId());
         waring.setOrg_index(dept.getOrgIndex());
         waring.setAlarm_type("99158eabc762e2f75fcc325d2055343e");
-        PageDomain pageDomain = TableSupport.getPageDomain();
-        PageHelper.startPage(pageDomain.getPageNum(), pageDomain.getPageSize(), pageDomain.getOrderBy());
+        if (paginate) {
+            PageDomain pageDomain = TableSupport.getPageDomain();
+            PageHelper.startPage(pageDomain.getPageNum(), pageDomain.getPageSize(), pageDomain.getOrderBy());
+        }
         if (com.ruoyi.common.utils.SecurityUtils.isAdmin(userId) && dept.getOrgIndex().equals("10")) {
             warings = hWaringMapper.selectReconditionList(waring);
         } else if (dept.getOrgIndex().equals("10")) {
@@ -1090,12 +1097,19 @@ public class HWaringServiceImpl implements HWaringService {
 
     @Override
     public List<HWaring> selectWubaoList(HWaring waring, Long userId) {
+        return selectWubaoList(waring, userId, true);
+    }
+
+    @Override
+    public List<HWaring> selectWubaoList(HWaring waring, Long userId, boolean paginate) {
         List<HWaring> warings;
         SysUser user = userMapper.selectUserById(userId);
         SysDept dept = sysDeptMapper.selectDeptById(user.getDeptId());
         waring.setOrg_index(dept.getOrgIndex());
-        PageDomain pageDomain = TableSupport.getPageDomain();
-        PageHelper.startPage(pageDomain.getPageNum(), pageDomain.getPageSize(), pageDomain.getOrderBy());
+        if (paginate) {
+            PageDomain pageDomain = TableSupport.getPageDomain();
+            PageHelper.startPage(pageDomain.getPageNum(), pageDomain.getPageSize(), pageDomain.getOrderBy());
+        }
         if (com.ruoyi.common.utils.SecurityUtils.isAdmin(userId) && dept.getOrgIndex().equals("10")) {
             warings = hWaringMapper.selectWubaoList(waring);
         } else if (dept.getOrgIndex().equals("10")) {

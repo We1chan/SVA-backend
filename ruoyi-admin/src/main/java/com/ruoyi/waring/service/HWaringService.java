@@ -93,7 +93,11 @@ public interface HWaringService {
 
     List<HWaring> selectReconditionList(HWaring waring, Long userId);
 
+    List<HWaring> selectReconditionList(HWaring waring, Long userId, boolean paginate);
+
     List<HWaring> selectWubaoList(HWaring waring, Long userId);
+
+    List<HWaring> selectWubaoList(HWaring waring, Long userId, boolean paginate);
 
     int getChuNum(Long userId, String org_index);
 

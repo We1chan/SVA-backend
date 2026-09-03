@@ -181,6 +181,56 @@ public class Gb28181DeviceSyncServiceTest {
         assertEquals(0, catalog.catalogUpserts);
     }
 
+    @Test
+    public void offlineCatalogCannotBePromotedOnlineByAnOldMediaStream() {
+        RecordingCatalogMapper catalog = new RecordingCatalogMapper();
+        Gb28181Channel channel = channel();
+        channel.setCatalogOnline(false);
+        catalog.seed(channel);
+        DeviceMirror devices = new DeviceMirror(null);
+        Gb28181DeviceSyncService service = new Gb28181DeviceSyncServiceImpl(
+            catalog, mapper(ZlmServerMapper.class, "selectEnabledById", zlmServer()), devices.proxy(), null);
+
+        service.syncDevices(1L, List.of(channel));
+        assertEquals("2", devices.inserted.getIs_online());
+        service.refreshMedia(1L, List.of(new Gb28181MediaStream("__defaultVhost__", "live", "gb-camera-01")));
+
+        assertEquals(0, devices.onlineUpdates.size());
+        assertEquals(1, devices.offlineUpdates.size());
+    }
+
+    @Test
+    public void droppedCatalogCannotBeRevivedByTheNextMediaRefresh() {
+        RecordingCatalogMapper catalog = new RecordingCatalogMapper();
+        catalog.seed(channel());
+        DeviceMirror devices = new DeviceMirror(null);
+        Gb28181DeviceSyncService service = new Gb28181DeviceSyncServiceImpl(
+            catalog, mapper(ZlmServerMapper.class, "selectEnabledById", zlmServer()), devices.proxy(), null);
+
+        service.syncDevices(1L, Collections.emptyList());
+        service.refreshMedia(1L, List.of(new Gb28181MediaStream("__defaultVhost__", "live", "gb-camera-01")));
+
+        assertEquals(0, devices.onlineUpdates.size());
+        assertEquals(2, devices.offlineUpdates.size());
+    }
+
+    @Test
+    public void legacyCatalogCannotOverwriteAChannelOwnedByWvp() {
+        RecordingCatalogMapper catalog = new RecordingCatalogMapper();
+        HDevice wvpDevice = new HDevice();
+        wvpDevice.setApe_id("GB_WVP");
+        wvpDevice.setGb_device_id(channel().getDeviceId());
+        wvpDevice.setGb_channel_id(channel().getChannelId());
+        wvpDevice.setStream_source_type("GB28181");
+        DeviceMirror devices = new DeviceMirror(wvpDevice);
+        Gb28181DeviceSyncService service = new Gb28181DeviceSyncServiceImpl(
+            catalog, mapper(ZlmServerMapper.class, "selectEnabledById", zlmServer()), devices.proxy(), null);
+
+        assertThrows(ServiceException.class, () -> service.syncDevices(1L, List.of(channel())));
+
+        assertEquals(0, catalog.catalogUpserts);
+    }
+
     private Gb28181Channel channel() {
         return channelWithChannelId("34020000001310000001");
     }

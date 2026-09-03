@@ -1,5 +1,6 @@
 package com.ruoyi.waring.service.impl;
 
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.mapper.HDeviceMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +14,10 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -69,6 +72,44 @@ class Gb28181SyncServiceImplTest {
         assertEquals("34020000001320000001", device.getGb_device_id());
         assertEquals("34020000001310000001", device.getGb_channel_id());
         assertEquals("1", device.getIs_online());
+        server.verify();
+    }
+
+    @Test
+    void rejectsMissingDirectoryInsteadOfOffliningEveryDevice() {
+        server.expect(requestTo("http://wvp.local/api/device/query/devices?page=1&count=200"))
+                .andRespond(withSuccess("{\"code\":0,\"data\":null}", MediaType.APPLICATION_JSON));
+
+        assertThrows(ServiceException.class, service::syncDevices);
+
+        verifyNoInteractions(mapper);
+        server.verify();
+    }
+
+    @Test
+    void rejectsIncompleteChannelPageBeforeWritingSnapshot() {
+        server.expect(requestTo("http://wvp.local/api/device/query/devices?page=1&count=200"))
+                .andRespond(withSuccess("{\"list\":[{\"deviceId\":\"device\",\"onLine\":true}],\"pages\":1}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://wvp.local/api/device/query/devices/device/channels?page=1&count=200"))
+                .andRespond(withSuccess("{\"code\":0,\"data\":{\"pages\":2}}", MediaType.APPLICATION_JSON));
+
+        assertThrows(ServiceException.class, service::syncDevices);
+
+        verifyNoInteractions(mapper);
+        server.verify();
+    }
+
+    @Test
+    void acceptsAuthoritativeEmptyDirectory() {
+        server.expect(requestTo("http://wvp.local/api/device/query/devices?page=1&count=200"))
+                .andRespond(withSuccess("{\"code\":0,\"data\":{\"list\":[],\"pages\":0,\"total\":0}}",
+                        MediaType.APPLICATION_JSON));
+
+        assertEquals(0, service.syncDevices().get("channelCount"));
+
+        verify(mapper).markAllGb28181DevicesOffline();
+        verify(mapper).clearOfflineGb28181Playback();
         server.verify();
     }
 }
