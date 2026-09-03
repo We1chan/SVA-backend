@@ -2,7 +2,10 @@ package com.ruoyi.waring.controller;
 
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.waring.domain.DeviceMonitorResult;
 import com.ruoyi.waring.domain.Gb28181Channel;
+import com.ruoyi.waring.domain.HDevice;
+import com.ruoyi.waring.service.DeviceMonitorService;
 import com.ruoyi.waring.service.HDeviceService;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +15,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** HTTP-facing contract of the GB28181 catalog sync and status refresh endpoints. */
 public class HDeviceControllerTest {
@@ -97,6 +104,60 @@ public class HDeviceControllerTest {
                     throw new ServiceException("调用 ZLM 媒体列表失败");
                 }
                 return null;
+            });
+    }
+
+    // ===== 监控启停端点契约测试：验证 Controller 只做包装 =====
+
+    @Test
+    public void startMonitorWrapsServiceSuccess() {
+        HDeviceController controller = new HDeviceController();
+        controller.deviceMonitorService = new DeviceMonitorService(monitorService(1, device("ape-1")));
+
+        AjaxResult result = controller.startMonitor("ape-1");
+
+        assertEquals(200, result.get(AjaxResult.CODE_TAG));
+        DeviceMonitorResult payload = (DeviceMonitorResult) result.get(AjaxResult.DATA_TAG);
+        assertTrue(payload.isSuccess());
+        assertNotNull(payload.getData());
+    }
+
+    @Test
+    public void startMonitorWrapsDeviceNotFound() {
+        HDeviceController controller = new HDeviceController();
+        controller.deviceMonitorService = new DeviceMonitorService(monitorService(0, null));
+
+        AjaxResult result = controller.startMonitor("missing");
+
+        assertEquals(200, result.get(AjaxResult.CODE_TAG));
+        DeviceMonitorResult payload = (DeviceMonitorResult) result.get(AjaxResult.DATA_TAG);
+        assertFalse(payload.isSuccess());
+        assertEquals("设备不存在", payload.getShortMessage());
+        assertNull(payload.getData());
+    }
+
+    private HDevice device(String apeId) {
+        HDevice device = new HDevice();
+        device.setApe_id(apeId);
+        return device;
+    }
+
+    @SuppressWarnings("unchecked")
+    private HDeviceService monitorService(int rows, HDevice device) {
+        return (HDeviceService) Proxy.newProxyInstance(
+            HDeviceService.class.getClassLoader(),
+            new Class<?>[] { HDeviceService.class },
+            (proxy, method, args) -> {
+                switch (method.getName()) {
+                    case "selectDeviceByApeId":
+                        return device;
+                    case "startMonitor":
+                    case "stopMonitor":
+                        return rows;
+                    default:
+                        return method.getReturnType() == int.class ? 0
+                            : method.getReturnType() == boolean.class ? Boolean.FALSE : null;
+                }
             });
     }
 }

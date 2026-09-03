@@ -3,10 +3,10 @@ package com.ruoyi.waring.controller;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
-import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.domain.HDevice;
+import com.ruoyi.waring.service.DeviceMonitorService;
 import com.ruoyi.waring.service.Gb28181SyncService;
 import com.ruoyi.waring.service.HDeviceService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,6 +40,9 @@ public class HDeviceController extends BaseController {
 
     @Autowired
     HDeviceService hDeviceService;
+
+    @Autowired
+    DeviceMonitorService deviceMonitorService;
 
     @Autowired
     private Gb28181SyncService gb28181SyncService;
@@ -139,23 +141,7 @@ public class HDeviceController extends BaseController {
     @PreAuthorize("@ss.hasPermi('waring:device:start')")
     @PostMapping("/monitor/{apeId}/start")
     public AjaxResult startMonitor(@PathVariable String apeId) {
-        HDevice existedDevice = hDeviceService.selectDeviceByApeId(apeId);
-        if (existedDevice == null) {
-            return buildMonitorActionResult(false, "启动", "设备不存在", null);
-        }
-
-        try {
-            int rows = hDeviceService.startMonitor(apeId);
-            if (rows <= 0) {
-                HDevice latest = hDeviceService.selectDeviceByApeId(apeId);
-                return buildMonitorActionResult(false, "启动", "启动监控失败", latest);
-            }
-            HDevice latest = hDeviceService.selectDeviceByApeId(apeId);
-            return buildMonitorActionResult(true, "启动", "启动监控成功", latest);
-        } catch (Exception ex) {
-            HDevice latest = hDeviceService.selectDeviceByApeId(apeId);
-            return buildMonitorActionResult(false, "启动", resolveMonitorFailMessage("启动", ex), latest);
-        }
+        return AjaxResult.success(deviceMonitorService.start(apeId));
     }
 
     /**
@@ -164,23 +150,7 @@ public class HDeviceController extends BaseController {
     @PreAuthorize("@ss.hasPermi('waring:device:stop')")
     @PostMapping("/monitor/{apeId}/stop")
     public AjaxResult stopMonitor(@PathVariable String apeId) {
-        HDevice existedDevice = hDeviceService.selectDeviceByApeId(apeId);
-        if (existedDevice == null) {
-            return buildMonitorActionResult(false, "停止", "设备不存在", null);
-        }
-
-        try {
-            int rows = hDeviceService.stopMonitor(apeId);
-            if (rows <= 0) {
-                HDevice latest = hDeviceService.selectDeviceByApeId(apeId);
-                return buildMonitorActionResult(false, "停止", "停止监控失败", latest);
-            }
-            HDevice latest = hDeviceService.selectDeviceByApeId(apeId);
-            return buildMonitorActionResult(true, "停止", "停止监控成功", latest);
-        } catch (Exception ex) {
-            HDevice latest = hDeviceService.selectDeviceByApeId(apeId);
-            return buildMonitorActionResult(false, "停止", resolveMonitorFailMessage("停止", ex), latest);
-        }
+        return AjaxResult.success(deviceMonitorService.stop(apeId));
     }
 
     /**
@@ -211,41 +181,5 @@ public class HDeviceController extends BaseController {
     @PostMapping("/gb28181/status/refresh")
     public AjaxResult gb28181StatusRefresh(@RequestParam(defaultValue = "1") Long zlmServerId) {
         return success(hDeviceService.refreshGb28181Status(zlmServerId));
-    }
-
-    private AjaxResult buildMonitorActionResult(boolean success, String action, String shortMessage, HDevice device) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("success", success);
-        String defaultMessage = success ? action + "监控成功" : action + "监控失败";
-        payload.put("shortMessage", StringUtils.isEmpty(shortMessage) ? defaultMessage : shortMessage);
-        payload.put("data", device);
-        return AjaxResult.success(payload);
-    }
-
-    private String resolveMonitorFailMessage(String action, Exception ex) {
-        String fallback = action + "监控失败";
-        if (ex == null) {
-            return fallback;
-        }
-
-        String message = ex.getMessage();
-        if (StringUtils.isEmpty(message)) {
-            return fallback;
-        }
-
-        String lowerMessage = message.toLowerCase();
-        if (lowerMessage.contains("pull stream connect error")) {
-            return "读取视频流失败，请确认设备启动了视频流";
-        }
-        if (lowerMessage.contains("push stream connect error")) {
-            return "推送失败，请稍后再试！";
-        }
-        if (lowerMessage.contains("already exists")) {
-            return "设备监控已经启动过";
-        }
-        if (lowerMessage.contains("timeout")) {
-            return "连接超时";
-        }
-        return message;
     }
 }
