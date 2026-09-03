@@ -4,6 +4,12 @@
 
 跨仓库的数据流、代码入口和维护边界见
 [流媒体协议组代码地图](https://github.com/We1chan/FWWsva/blob/master/docs/gb28181-code-map.md)。
+其他电脑的 CPU/GPU 选择、生产安装和排障步骤见
+[跨电脑部署与验收指南](https://github.com/We1chan/FWWsva/blob/master/docs/gb28181-cross-machine-guide.md)。
+
+> `deploy/gb28181/systemd/` 是当前 WSL 开发工作区的样例单元，包含
+> `/mnt/d/Codex/easySVA` 固定路径。其他电脑不要原样安装这些单元，应使用 FWWsva
+> 生产安装器生成 `/opt/SVA` 服务；仅做本地开发时才按实际工作区修改样例副本。
 
 ## 服务边界
 
