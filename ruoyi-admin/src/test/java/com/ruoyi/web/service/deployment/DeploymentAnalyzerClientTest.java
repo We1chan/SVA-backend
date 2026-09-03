@@ -195,4 +195,15 @@ class DeploymentAnalyzerClientTest {
 
         return task;
     }
+
+    @Test
+    void rejectsRecoveryWhenPrimaryRegionHasFewerThanThreePoints() {
+        com.ruoyi.system.domain.DeploymentTask task = new com.ruoyi.system.domain.DeploymentTask();
+        task.setGeometryConfig("{\"regions\":[{\"primary\":true,\"points\":[{\"x\":0.1,\"y\":0.1},{\"x\":0.9,\"y\":0.1}]}]}");
+
+        DeploymentAnalyzerClient.AnalyzerResult result = client.ensureControl(task);
+
+        assertTrue(!result.isSuccess());
+        assertEquals("geometryConfig中至少需要一个3点以上的主区域", result.getMessage());
+    }
 }

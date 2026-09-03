@@ -1248,7 +1248,10 @@ public class HWaringController extends BaseController implements SvaDetectEventC
 
     private String normalizeBehaviorType(String behaviorType) {
         String normalized = behaviorType == null ? "" : behaviorType.trim().toLowerCase(Locale.ROOT);
-        // Analyzer uses "sleep" internally; keep the public warning/filter contract stable.
+        // The analyzer uses the generic evaluator name "sleep" on the wire,
+        // while the backend exposes the stable business alarm code sleep_duty.
+        // Normalize the protocol alias before the supported-type check so live
+        // sleep events are persisted instead of only being relayed to preview.
         if ("sleep".equals(normalized)) {
             return SLEEP_DUTY_BEHAVIOR_TYPE;
         }

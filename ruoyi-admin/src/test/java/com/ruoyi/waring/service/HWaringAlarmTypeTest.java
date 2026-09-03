@@ -41,6 +41,8 @@ public class HWaringAlarmTypeTest {
         assertEquals("sleep_duty", normalize.invoke(controller, "sleep_duty"));
         assertEquals("sleep_duty", normalize.invoke(controller, "  SLEEP_DUTY  "));
         assertEquals("sleep_duty", normalize.invoke(controller, "SLEEP_DUTY"));
+        assertEquals("sleep_duty", normalize.invoke(controller, "sleep"));
+        assertEquals("sleep_duty", normalize.invoke(controller, "  SLEEP  "));
         assertEquals("", normalize.invoke(controller, "unknown_type"));
         assertEquals("", normalize.invoke(controller, (Object) null));
     }

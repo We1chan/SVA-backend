@@ -151,6 +151,116 @@ public class DeploymentAnalyzerClient
         return postJson(analyzerAddUrl, payload, "add");
     }
 
+    /**
+     * Idempotently ensure that a persisted RUNNING deployment exists in the
+     * analyzer. The analyzer treats an already-running control as success, so
+     * this method is safe for startup recovery and live-preview requests.
+     */
+    public AnalyzerResult ensureControl(DeploymentTask task)
+    {
+        String recognitionRegion = buildRecognitionRegion(task);
+        if (StringUtils.isEmpty(recognitionRegion))
+        {
+            return AnalyzerResult.fail("geometryConfig中至少需要一个3点以上的主区域");
+        }
+        return addControl(task, recognitionRegion);
+    }
+
+    private String buildRecognitionRegion(DeploymentTask task)
+    {
+        if (task == null || StringUtils.isBlank(task.getGeometryConfig()))
+        {
+            return null;
+        }
+        try
+        {
+            JsonNode root = OBJECT_MAPPER.readTree(task.getGeometryConfig());
+            JsonNode regions = root == null ? null : root.get("regions");
+            if (regions == null || !regions.isArray())
+            {
+                return null;
+            }
+
+            String fallback = null;
+            for (JsonNode region : regions)
+            {
+                String value = buildRecognitionRegionFromPoints(region == null ? null : region.get("points"));
+                if (StringUtils.isEmpty(value) && region != null)
+                {
+                    value = buildRecognitionRegionFromPoints(region.get("polygon"));
+                }
+                if (StringUtils.isEmpty(value) && region != null)
+                {
+                    value = buildRecognitionRegionFromPoints(region.get("vertices"));
+                }
+                if (StringUtils.isEmpty(value))
+                {
+                    continue;
+                }
+                if (fallback == null)
+                {
+                    fallback = value;
+                }
+                if (region.path("primary").asBoolean(false) || region.path("isPrimary").asBoolean(false))
+                {
+                    return value;
+                }
+            }
+            return fallback;
+        }
+        catch (Exception ex)
+        {
+            log.warn("恢复布控时解析geometryConfig失败，deploymentId={}", task.getDeploymentId(), ex);
+            return null;
+        }
+    }
+
+    private String buildRecognitionRegionFromPoints(JsonNode points)
+    {
+        if (points == null || !points.isArray())
+        {
+            return null;
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int count = 0;
+        if (points.size() > 0 && points.get(0).isNumber())
+        {
+            for (int index = 0; index + 1 < points.size(); index += 2)
+            {
+                count = appendRecognitionPoint(builder, count, points.get(index), points.get(index + 1));
+            }
+        }
+        else
+        {
+            for (JsonNode point : points)
+            {
+                if (point == null)
+                {
+                    continue;
+                }
+                JsonNode x = point.isArray() && point.size() >= 2 ? point.get(0) : point.get("x");
+                JsonNode y = point.isArray() && point.size() >= 2 ? point.get(1) : point.get("y");
+                count = appendRecognitionPoint(builder, count, x, y);
+            }
+        }
+        return count >= 3 ? builder.toString() : null;
+    }
+
+    private int appendRecognitionPoint(StringBuilder builder, int count, JsonNode x, JsonNode y)
+    {
+        if (x == null || y == null || !x.isNumber() || !y.isNumber())
+        {
+            return count;
+        }
+        if (builder.length() > 0)
+        {
+            builder.append(',');
+        }
+        builder.append(x.asDouble()).append(',').append(y.asDouble());
+        return count + 1;
+    }
+
     private void appendGeometryPayload(Map<String, Object> payload, DeploymentTask task)
     {
         if (payload == null || task == null || StringUtils.isBlank(task.getGeometryConfig()))
@@ -277,6 +387,21 @@ public class DeploymentAnalyzerClient
         if (bindingConfig == null)
         {
             return AnalyzerResult.fail("未绑定可用服务器或配置缺失");
+        }
+
+        // Server-overlay tasks already publish their algorithm stream from the
+        // original add request. Re-adding is idempotent and also restores the
+        // in-memory control after an analyzer/WSL restart. Older analyzers do
+        // not expose /api/control/live-output, so avoid calling that endpoint.
+        if (videoEnabled && Boolean.TRUE.equals(task.getPushEnabled())
+            && StringUtils.isNotBlank(task.getAlgorithmStreamUrl()))
+        {
+            AnalyzerResult ensured = ensureControl(task);
+            if (!ensured.isSuccess())
+            {
+                return ensured;
+            }
+            return AnalyzerResult.ok("算法流已启用", ensured.getDetailMessage());
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
