@@ -1327,11 +1327,82 @@ public class HWaringController extends BaseController implements SvaDetectEventC
     }
 
     /**
+     * 报警类型名兜底派生：清理 H3 老链路残留的 GUID 字串或"操作有误"等业务含义
+     * 不明的历史值，按 SVA 新链路的 sva_behavior_type 重新派生展示名。同时归一化
+     * region/line 名称中的脏值（GUID 形式、字面 placeholder 等），避免把内部
+     * 协议字段暴露到告警列表的"规则信息"列上。
+     */
+    private static final java.util.regex.Pattern GUID_LIKE_PATTERN =
+        java.util.regex.Pattern.compile("^[0-9a-fA-F]{8,}$");
+
+    private boolean looksLikeRawInternalToken(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+        String trimmed = value.trim();
+        if (GUID_LIKE_PATTERN.matcher(trimmed).matches()) {
+            return true;
+        }
+        // 历史脏值：H3 老链路写进来的 alarm_type_name，原本就是平台 GUID
+        // 或者字面的"操作有误"等不属于 SVA 业务码的标签。
+        if ("操作有误".equals(trimmed) || "未识别告警".equals(trimmed)) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean looksLikeDirtyRegionToken(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+        String trimmed = value.trim();
+        if (GUID_LIKE_PATTERN.matcher(trimmed).matches()) {
+            return true;
+        }
+        // 已知的脏 region 名称（与 index.vue 规则信息列保持一致）
+        return "fell-frame".equalsIgnoreCase(trimmed)
+            || "region_unknown".equalsIgnoreCase(trimmed);
+    }
+
+    /**
      * 获取报警信息列表
      */
     @GetMapping("/list")
     public TableDataInfo list(HWaring waring) {
         List<HWaring> list = hWaringService.selectWaringList(waring, getUserId(), 0);
+        if (list != null && !list.isEmpty()) {
+            for (HWaring row : list) {
+                if (row == null) {
+                    continue;
+                }
+                // 1. alarm_type / alarm_type_name 兜底派生
+                if (looksLikeRawInternalToken(row.getAlarm_type_name())
+                    || (row.getAlarm_type() != null && GUID_LIKE_PATTERN.matcher(row.getAlarm_type().trim()).matches())) {
+                    String behaviorType = normalizeBehaviorType(row.getSva_behavior_type());
+                    AlarmTypeMeta meta = resolveAlarmTypeMeta(behaviorType);
+                    if (meta != null) {
+                        row.setAlarm_type(meta.alarmType);
+                        if (looksLikeRawInternalToken(row.getAlarm_type_name())) {
+                            row.setAlarm_type_name(meta.alarmTypeName);
+                        }
+                    }
+                }
+
+                // 2. region/line 脏值清理
+                if (looksLikeDirtyRegionToken(row.getSva_region_name())) {
+                    log.debug("告警列表 region_name 兜底清理: w_id={} 原值={}", row.getW_id(), row.getSva_region_name());
+                    row.setSva_region_name(null);
+                }
+                if (looksLikeDirtyRegionToken(row.getSva_line_name())) {
+                    row.setSva_line_name(null);
+                }
+
+                // 3. 默认 AI 复核状态保持"未复核"原状（NULL 在前端已映射）
+                if (row.getAlarm_time() != null && row.getAlarm_time().trim().isEmpty()) {
+                    row.setAlarm_time(null);
+                }
+            }
+        }
         return getDataTable(list);
     }
 
