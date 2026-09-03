@@ -680,7 +680,9 @@ public class DeploymentAnalyzerClient
         // （ZLM 中不存在该流名，拉流必失败）。
         String catalogPlayUrl = null;
         String catalogPlay = device.getPlay_url();
-        if (StringUtils.isNotBlank(catalogPlay) && "GB28181".equalsIgnoreCase(device.getDevice_type()))
+        if (StringUtils.isNotBlank(catalogPlay)
+            && "GB28181".equalsIgnoreCase(device.getDevice_type())
+            && !gb28181)
         {
             String mediaRef = extractZlmMediaRef(catalogPlay);
             if (mediaRef == null)

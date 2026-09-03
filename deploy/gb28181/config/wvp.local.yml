@@ -57,7 +57,7 @@ media:
 
 user-settings:
   server-id: easysva-local
-  jwk-file: /opt/easySVA/wvp/jwk.json
+  jwk-file: /opt/SVA/wvp/jwk.json
   auto-apply-play: true
   # Keep this below the easySVA browser request timeout (23 seconds).
   play-timeout: 18000

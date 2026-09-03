@@ -79,8 +79,10 @@ class DeploymentAnalyzerClientTest {
     void usesActiveWvpRtspRouteOnlyWhileGbDeviceIsOnline() {
         HDevice gb = new HDevice();
         gb.setApe_id("GB_TEST");
+        gb.setDevice_type("GB28181");
         gb.setStream_source_type("GB28181");
         gb.setIs_online("1");
+        gb.setPlay_url("ws://10.0.0.2:9996/rtp/wvp-stream.live.flv");
         gb.setGb_stream_url("rtsp://10.0.0.2:9997/rtp/stream-1");
         when(deviceMapper.selectDeviceByApeId("GB_TEST")).thenReturn(gb);
 
