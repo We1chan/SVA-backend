@@ -262,10 +262,9 @@ public class DeploymentController
         {
             return buildActionResult(false, "启动", "deviceId不能为空", "deviceId不能为空", record);
         }
-        if (StringUtils.isEmpty(record.getStreamUrl()))
-        {
-            return buildActionResult(false, "启动", "streamUrl不能为空", "streamUrl不能为空", record);
-        }
+        // The effective input is resolved from the bound device immediately before the
+        // analyzer request. GB28181 playback URLs are created by WVP at runtime and are
+        // therefore intentionally not persisted in deployment_task.stream_url.
         if (Boolean.TRUE.equals(record.getPushEnabled()) && StringUtils.isEmpty(record.getPushStreamUrl()))
         {
             return buildActionResult(false, "启动", "已启用推流但pushStreamUrl为空", "已启用推流但pushStreamUrl为空", record);
