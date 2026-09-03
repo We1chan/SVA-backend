@@ -15,12 +15,13 @@ sudo apt install -y \
   gstreamer1.0-plugins-ugly gstreamer1.0-libav \
   libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libglib2.0-dev
 
-cd /mnt/d/Codex/easySVA
+cd /path/to/easySVA
 git clone https://github.com/sb-im/sbgb28181.git
 git -C sbgb28181 checkout 1da9bc62134d4cb1fd4374f733583fb5997c3f0a
 ```
 
 如果已存在 `sbgb28181` 目录，只需确认 `git -C sbgb28181 rev-parse HEAD` 输出上述提交。
+将 `/path/to/easySVA` 替换为五个仓库所在的实际父目录。
 
 ## 2. 启动并验证注册
 
