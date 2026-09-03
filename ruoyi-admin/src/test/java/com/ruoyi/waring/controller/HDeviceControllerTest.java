@@ -4,15 +4,15 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.waring.domain.Gb28181Channel;
 import com.ruoyi.waring.service.HDeviceService;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** HTTP-facing contract of the GB28181 catalog sync and status refresh endpoints. */
 public class HDeviceControllerTest {

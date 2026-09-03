@@ -1,14 +1,14 @@
 package com.ruoyi.waring.service;
 
 import com.ruoyi.waring.controller.HWaringController;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 阶段 4：睡岗告警 (SLEEP_DUTY) 业务闭环——通过反射直接验证 HWaringController 中的
@@ -51,7 +51,7 @@ public class HWaringAlarmTypeTest {
         Method resolve = controller.getClass().getDeclaredMethod("resolveAlarmTypeMeta", String.class);
         resolve.setAccessible(true);
         Object meta = resolve.invoke(controller, "sleep_duty");
-        assertNotNull("sleep_duty 必须解析到 AlarmTypeMeta", meta);
+        assertNotNull(meta, "sleep_duty 必须解析到 AlarmTypeMeta");
         Field alarmType = meta.getClass().getDeclaredField("alarmType");
         Field alarmTypeName = meta.getClass().getDeclaredField("alarmTypeName");
         alarmType.setAccessible(true);
@@ -87,8 +87,8 @@ public class HWaringAlarmTypeTest {
         Field absenceName = absenceMeta.getClass().getDeclaredField("alarmTypeName");
         absenceType.setAccessible(true);
         absenceName.setAccessible(true);
-        assertTrue("SLEEP_DUTY 不应与 SVA_ABSENCE 共享告警类型", !sleepType.equals(absenceType.get(absenceMeta)));
-        assertTrue("睡岗告警 不应与 离岗/缺席告警 共享告警名", !sleepName.equals(absenceName.get(absenceMeta)));
+        assertTrue(!sleepType.equals(absenceType.get(absenceMeta)), "SLEEP_DUTY 不应与 SVA_ABSENCE 共享告警类型");
+        assertTrue(!sleepName.equals(absenceName.get(absenceMeta)), "睡岗告警 不应与 离岗/缺席告警 共享告警名");
     }
 
     private static String readStaticString(Class<?> cls, String name) throws Exception {

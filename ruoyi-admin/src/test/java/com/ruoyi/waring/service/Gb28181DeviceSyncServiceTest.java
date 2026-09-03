@@ -9,7 +9,7 @@ import com.ruoyi.waring.mapper.Gb28181CatalogMapper;
 import com.ruoyi.waring.mapper.HDeviceMapper;
 import com.ruoyi.waring.mapper.ZlmServerMapper;
 import com.ruoyi.waring.service.impl.Gb28181DeviceSyncServiceImpl;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.ResourceAccessException;
@@ -23,9 +23,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The SIP/GB catalog owns identity; ZLM only confirms explicit media bindings. */
 public class Gb28181DeviceSyncServiceTest {
