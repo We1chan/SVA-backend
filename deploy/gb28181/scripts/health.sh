@@ -4,6 +4,7 @@
 set -u
 
 fail=0
+zlm_secret="${GB28181_ZLM_SECRET:-easySVA.GB28181.ZLM}"
 
 check_tcp() {
   local name="$1"
@@ -16,13 +17,25 @@ check_tcp() {
   fi
 }
 
-check_udp() {
-  local name="$1"
-  local port="$2"
-  if ss -lnu | grep -q ":${port} "; then
-    printf '%-18s OK   UDP %s\n' "$name" "$port"
+check_sip_transports() {
+  local port="$1"
+  local tcp=0
+  local udp=0
+  ss -lnt | grep -q ":${port} " && tcp=1
+  ss -lnu | grep -q ":${port} " && udp=1
+
+  if (( tcp == 1 )); then
+    printf '%-18s OK   TCP %s\n' "SIP TCP" "$port"
   else
-    printf '%-18s FAIL UDP %s\n' "$name" "$port"
+    printf '%-18s WARN TCP %s not listening\n' "SIP TCP" "$port"
+  fi
+  if (( udp == 1 )); then
+    printf '%-18s OK   UDP %s\n' "SIP UDP" "$port"
+  else
+    printf '%-18s WARN UDP %s not listening\n' "SIP UDP" "$port"
+  fi
+  if (( tcp == 0 && udp == 0 )); then
+    printf '%-18s FAIL no SIP transport is listening on %s\n' "SIP" "$port"
     fail=1
   fi
 }
@@ -38,10 +51,23 @@ check_http() {
   fi
 }
 
+check_zlm_api() {
+  local name="$1"
+  local endpoint="$2"
+  local response
+  response="$(curl --noproxy '*' -fsS --get \
+    --data-urlencode "secret=$zlm_secret" "$endpoint" 2>/dev/null || true)"
+  if grep -Eq '"code"[[:space:]]*:[[:space:]]*0' <<<"$response"; then
+    printf '%-18s OK   %s\n' "$name" "$endpoint"
+  else
+    printf '%-18s FAIL %s (API secret or service error)\n' "$name" "$endpoint"
+    fail=1
+  fi
+}
+
 check_http "WVP HTTP" "http://127.0.0.1:18080/api/device/query/devices?page=1&count=1"
-check_tcp "SIP TCP" 5060
-check_udp "SIP UDP" 5060
-check_http "GB ZLM HTTP" "http://127.0.0.1:9996/index/api/getApiList?secret=easySVA.GB28181.ZLM"
+check_sip_transports 5060
+check_zlm_api "GB ZLM HTTP" "http://127.0.0.1:9996/index/api/getApiList"
 check_tcp "GB ZLM RTSP" 9997
 check_http "Original Web" "http://127.0.0.1:8080/"
 check_tcp "Original RTSP" 9994

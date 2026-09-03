@@ -5,7 +5,8 @@
 [CmdletBinding()]
 param(
     [string]$WvpBaseUrl = 'http://127.0.0.1:18080',
-    [int]$Count = 100
+    [int]$Count = 100,
+    [string]$WslDistro = 'Ubuntu-22.04'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,7 +42,14 @@ if (-not $page -or -not $page.PSObject.Properties['list']) {
     exit 1
 }
 
-$hostIp = (& wsl.exe -d Ubuntu-22.04 -- bash -lc "ip route get 1.1.1.1 | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -n1").Trim()
+if (-not $PSBoundParameters.ContainsKey('WslDistro') -and $env:EASYSVA_WSL_DISTRO) {
+    $WslDistro = $env:EASYSVA_WSL_DISTRO
+}
+
+$hostIp = (& wsl.exe -d $WslDistro -- bash -lc "ip route get 1.1.1.1 | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -n1").Trim()
+if ($LASTEXITCODE -ne 0 -or -not $hostIp) {
+    throw "Cannot determine the GB28181 host IP from WSL distribution '$WslDistro'."
+}
 $devices = @($page.list)
 $total = if ($page.PSObject.Properties['total']) { [int]$page.total } else { $devices.Count }
 

@@ -44,6 +44,11 @@
 
 当前配置面向本机开发环境。SIP 密码、数据库密码和 ZLM API secret 在真实部署前必须改为环境专用值。
 
+本地环境不同时可通过环境变量覆盖：`EASYSVA_JAVA21_BIN` 指定 Java 21
+可执行文件，`SPRING_DATASOURCE_URL` 指定 WVP 数据库完整 JDBC 地址，
+`WVP_DB_USERNAME`、`WVP_DB_PASSWORD` 和 `GB28181_ZLM_SECRET` 指定凭据。
+这些值应来自本机私有环境文件，不要提交到 Git。
+
 ## 自动回归
 
 平台侧代码、数据库迁移、运行服务和原有 RTSP 链路可以用一条命令重复验证：
@@ -52,7 +57,7 @@
 bash deploy/gb28181/scripts/regression.sh
 ```
 
-脚本会依次检查 shell/systemd 配置、重复执行数据库迁移、运行 Java 单元测试、检查 WVP/ZLM/easySVA 服务，并用 `ffprobe` 验证原有 RTSP 流。如果本机使用其他回归流，可通过 `RTSP_REGRESSION_URL` 覆盖默认地址。WVP 点播超时固定为 18 秒，easySVA 后端读取超时为 20 秒，均低于现有浏览器请求的 23 秒，避免页面先超时而后台仍继续点播。
+脚本会依次检查 shell/systemd 配置、重复执行数据库迁移、运行 Java 单元测试、检查 WVP/ZLM/easySVA 服务，并用 `ffprobe` 验证原有 RTSP 流。它还会执行 FWWsva 中的完整业务迁移，避免新代码查询 `device_type` 等字段时数据库仍是旧结构；仓库不在同级目录时用 `EASYSVA_GB28181_BUSINESS_MIGRATION` 指定迁移文件。MySQL 需要密码时，用 `EASYSVA_MYSQL_DEFAULTS_FILE` 指向权限为 `0600` 的客户端配置文件，不要把密码写进命令行。如果本机使用其他回归流，可通过 `RTSP_REGRESSION_URL` 覆盖默认地址。WVP 点播超时固定为 18 秒，easySVA 后端读取超时为 20 秒，均低于现有浏览器请求的 23 秒，避免页面先超时而后台仍继续点播。
 
 ## 软件模拟器接入与验收
 
@@ -60,7 +65,7 @@ bash deploy/gb28181/scripts/regression.sh
 
 1. 按 [`acceptance-software-simulator.md`](acceptance-software-simulator.md) 安装依赖并锁定已验证的模拟器版本。
 2. 运行 `bash deploy/gb28181/scripts/simulator-start.sh`。脚本只在模拟器目录本地编译 GStreamer 插件，不做全局安装；设备注册后会自动将 WVP 媒体传输设为 UDP。
-3. 运行 `device-check.ps1`，再在 easySVA 设备页点击“启动监控”和“预览视频”。
+3. 运行 `device-check.ps1`，再在 easySVA 设备页点击“启动监控”和“预览视频”。WSL 发行版名称不是默认的 `Ubuntu-22.04` 时传入 `-WslDistro <名称>`，或设置 `EASYSVA_WSL_DISTRO`。
 4. `Ctrl+C` 停止模拟器可验证离线同步；重新运行脚本可验证恢复上线。
 
 模拟器的环境变量、预期结果、API 与 `ffprobe` 复验方法见软件模拟验收文档。
@@ -69,7 +74,7 @@ bash deploy/gb28181/scripts/regression.sh
 
 本仓库已完成平台侧的 WVP、ZLMediaKit 和 easySVA 同步逻辑。如果学校要求额外使用硬件复验，可再将一台支持 GB28181 的 IPC 与本机放在同一局域网，按下列参数接入。
 
-1. 先运行 `bash deploy/gb28181/scripts/health.sh`。其中 `WVP HTTP`、`SIP TCP`、`SIP UDP`、`GB ZLM HTTP` 和 `GB ZLM RTSP` 必须均为 `OK`。
+1. 先运行 `bash deploy/gb28181/scripts/health.sh`。其中 `WVP HTTP`、`GB ZLM HTTP` 和 `GB ZLM RTSP` 必须均为 `OK`；`SIP TCP`、`SIP UDP` 至少有与设备配置一致的一种为 `OK`。WSL 镜像网络可能因 Windows 动态排除端口使 TCP 5060 为 `WARN`，此时软件相机先使用 UDP。
 2. 以管理员身份运行 `open-firewall.ps1`，允许局域网访问 SIP、WebSocket 预览、RTSP 和 RTP 端口：
 
    ```powershell
