@@ -157,6 +157,7 @@ public class Gb28181DeviceSyncServiceTest {
         assertEquals(0, result.getUpdated());
         assertEquals(0, result.getOfflineMarked());
         assertEquals(0, catalog.catalogUpserts);
+        assertEquals(0, catalog.catalogOfflineUpdates);
         assertEquals(0, devices.offlineUpdates.size());
         assertEquals(0, devices.onlineUpdates.size());
     }
@@ -178,8 +179,9 @@ public class Gb28181DeviceSyncServiceTest {
         assertEquals(1, devices.offlineUpdates.size());
         assertEquals("34020000001310000001", devices.offlineUpdates.get(0)[2]);
         assertEquals("2", devices.offlineUpdates.get(0)[3]);
-        assertEquals(1, catalog.catalogUpserts);
-        assertEquals(false, catalog.cataloged.isCatalogOnline());
+        assertEquals(0, catalog.catalogUpserts);
+        assertEquals(1, catalog.catalogOfflineUpdates);
+        assertEquals(false, catalog.selectChannelsByZlmServerId(1L).get(0).isCatalogOnline());
     }
 
     @Test
@@ -213,6 +215,7 @@ public class Gb28181DeviceSyncServiceTest {
 
         assertEquals(0, devices.onlineUpdates.size());
         assertEquals(2, devices.offlineUpdates.size());
+        assertEquals(1, catalog.catalogOfflineUpdates);
     }
 
     @Test
@@ -286,6 +289,7 @@ public class Gb28181DeviceSyncServiceTest {
         private int catalogUpserts;
         private int mediaAvailableUpdates;
         private int mediaUnavailableUpdates;
+        private int catalogOfflineUpdates;
 
         private void seed(Gb28181Channel channel) {
             channels.put(channel.getDeviceId() + "\u0000" + channel.getChannelId(), channel);
@@ -320,6 +324,17 @@ public class Gb28181DeviceSyncServiceTest {
             } else {
                 mediaUnavailableUpdates++;
             }
+            return 1;
+        }
+
+        @Override
+        public int markCatalogChannelOffline(Long zlmServerId, String deviceId, String channelId) {
+            Gb28181Channel channel = channels.get(deviceId + "\u0000" + channelId);
+            if (channel == null || !zlmServerId.equals(channel.getZlmServerId())) {
+                return 0;
+            }
+            channel.setCatalogOnline(false);
+            catalogOfflineUpdates++;
             return 1;
         }
     }

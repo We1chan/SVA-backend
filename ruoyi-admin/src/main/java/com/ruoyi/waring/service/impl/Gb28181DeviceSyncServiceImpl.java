@@ -15,6 +15,7 @@ import com.ruoyi.waring.service.Gb28181DeviceSyncService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -60,6 +61,7 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DeviceSyncResult syncDevices(Long zlmServerId, List<Gb28181Channel> channels) {
         if (zlmServerId == null) {
             throw new ServiceException("zlmServerId 不能为空");
@@ -93,18 +95,13 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
 
         List<Gb28181Channel> cataloged = catalogMapper.selectChannelsByZlmServerId(zlmServerId);
         Set<String> incomingKeys = incoming.stream().map(this::identityKey).collect(Collectors.toSet());
-        Set<String> existingKeys = cataloged.stream()
-            .map(this::identityKey)
-            .collect(Collectors.toCollection(HashSet::new));
-
         DeviceSyncResult result = new DeviceSyncResult();
         for (Gb28181Channel existing : cataloged) {
             if (!incomingKeys.contains(identityKey(existing))) {
-                // Persist the authoritative catalog-offline state as well as the
-                // h_device mirror. Otherwise a stale ZLM stream can promote this
-                // removed channel back online during the next media refresh.
+                // Persist both offline flags without rewriting catalog metadata.
+                catalogMapper.markCatalogChannelOffline(
+                    zlmServerId, existing.getDeviceId(), existing.getChannelId());
                 existing.setCatalogOnline(false);
-                catalogMapper.upsertCatalogChannel(existing);
                 int rows = hDeviceMapper.updateGbDeviceOnlineByChannel(
                     zlmServerId, existing.getDeviceId(), existing.getChannelId(), OFFLINE);
                 result.addOfflineMarked(rows);
@@ -112,9 +109,9 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
         }
 
         for (Gb28181Channel channel : incoming) {
-            catalogMapper.upsertCatalogChannel(channel);
             HDevice existed = hDeviceMapper.selectGbDevice(
                 zlmServerId, channel.getDeviceId(), channel.getChannelId());
+            catalogMapper.upsertCatalogChannel(channel);
             HDevice mirror = new HDevice();
             mirror.setApe_id(existed == null
                 ? buildApeId(channel.getDeviceId(), channel.getChannelId())

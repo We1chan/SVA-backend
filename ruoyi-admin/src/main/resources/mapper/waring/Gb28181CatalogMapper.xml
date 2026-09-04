@@ -45,4 +45,12 @@
             update_time = NOW()
         WHERE id = #{id}
     </update>
+
+    <update id="markCatalogChannelOffline">
+        UPDATE gb28181_channel
+        SET catalog_online = 0, media_online = 0, update_time = NOW()
+        WHERE zlm_server_id = #{zlmServerId}
+          AND device_id = #{deviceId}
+          AND channel_id = #{channelId}
+    </update>
 </mapper>

@@ -57,6 +57,8 @@ class Gb28181PlaybackServiceImplTest {
                         "\"code\":0,\"data\":{\"stream\":\"gb_stream_1\"}}",
                         MediaType.APPLICATION_JSON));
 
+        server.expect(requestTo("http://wvp.local/api/play/stop/device/channel"))
+                .andRespond(withSuccess("{\"code\":0}", MediaType.APPLICATION_JSON));
         assertThrows(ServiceException.class, () -> service.start("device", "channel"));
         server.verify();
     }

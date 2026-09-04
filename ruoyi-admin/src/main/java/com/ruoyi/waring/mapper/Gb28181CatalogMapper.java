@@ -2,6 +2,7 @@ package com.ruoyi.waring.mapper;
 
 import com.ruoyi.waring.domain.Gb28181Channel;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,4 +15,8 @@ public interface Gb28181CatalogMapper {
     List<Gb28181Channel> selectChannelsByZlmServerId(Long zlmServerId);
 
     int updateMediaAvailability(Long id, boolean available);
+
+    int markCatalogChannelOffline(@Param("zlmServerId") Long zlmServerId,
+                                  @Param("deviceId") String deviceId,
+                                  @Param("channelId") String channelId);
 }
