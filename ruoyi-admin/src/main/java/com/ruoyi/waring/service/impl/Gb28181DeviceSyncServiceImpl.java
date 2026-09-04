@@ -86,6 +86,11 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
             if (!zlmServerId.equals(channel.getZlmServerId())) {
                 throw new ServiceException("目录通道 zlmServerId 与请求不一致: " + channel.getChannelId());
             }
+            HDevice owner = hDeviceMapper.selectGbDevice(
+                zlmServerId, channel.getDeviceId(), channel.getChannelId());
+            if (owner != null && "GB28181".equalsIgnoreCase(owner.getStream_source_type())) {
+                throw new ServiceException("该国标通道已由 WVP 同步管理，禁止旧目录覆盖: " + channel.getChannelId());
+            }
         }
 
         List<Gb28181Channel> cataloged = catalogMapper.selectChannelsByZlmServerId(zlmServerId);
@@ -93,6 +98,7 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
         DeviceSyncResult result = new DeviceSyncResult();
         for (Gb28181Channel existing : cataloged) {
             if (!incomingKeys.contains(identityKey(existing))) {
+                // Persist both offline flags without rewriting catalog metadata.
                 catalogMapper.markCatalogChannelOffline(
                     zlmServerId, existing.getDeviceId(), existing.getChannelId());
                 existing.setCatalogOnline(false);
@@ -105,10 +111,6 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
         for (Gb28181Channel channel : incoming) {
             HDevice existed = hDeviceMapper.selectGbDevice(
                 zlmServerId, channel.getDeviceId(), channel.getChannelId());
-            if (isWvpOwnedMirror(existed)) {
-                throw new ServiceException("目录通道已由 WVP 同步维护，拒绝旧目录覆盖: "
-                    + channel.getChannelId());
-            }
             catalogMapper.upsertCatalogChannel(channel);
             HDevice mirror = new HDevice();
             mirror.setApe_id(existed == null
@@ -147,7 +149,9 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
 
         MediaRefreshResult result = new MediaRefreshResult();
         for (Gb28181Channel channel : catalogMapper.selectChannelsByZlmServerId(zlmServerId)) {
-            boolean available = activeBindings.contains(bindingKey(channel));
+            // Catalog presence is authoritative. A stale media stream alone must
+            // never resurrect a device that has unregistered or was dropped.
+            boolean available = channel.isCatalogOnline() && activeBindings.contains(bindingKey(channel));
             catalogMapper.updateMediaAvailability(channel.getId(), available);
             if (available) {
                 result.incrementAvailable();
@@ -155,10 +159,9 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
                 result.incrementUnavailable();
             }
             if (hDeviceMapper != null) {
-                String online = available && channel.isCatalogOnline() ? ONLINE : OFFLINE;
                 hDeviceMapper.updateGbDeviceOnlineByChannel(
                     zlmServerId, channel.getDeviceId(), channel.getChannelId(),
-                    online);
+                    available ? ONLINE : OFFLINE);
             }
         }
         return result;
@@ -231,10 +234,6 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
 
     private String identityKey(Gb28181Channel channel) {
         return channel.getDeviceId() + "\u0000" + channel.getChannelId();
-    }
-
-    private boolean isWvpOwnedMirror(HDevice device) {
-        return device != null && GB_DEVICE_TYPE.equalsIgnoreCase(device.getStream_source_type());
     }
 
     private String buildApeId(String deviceId, String channelId) {

@@ -2,10 +2,13 @@ package com.ruoyi.waring.service;
 
 import com.ruoyi.waring.domain.DeviceMonitorResult;
 import com.ruoyi.waring.domain.HDevice;
+import com.ruoyi.system.domain.DeploymentTask;
+import com.ruoyi.system.service.IDeploymentTaskService;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,6 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /** 设备监控启停统一编排服务的业务契约测试。 */
 public class DeviceMonitorServiceTest {
@@ -56,6 +63,24 @@ public class DeviceMonitorServiceTest {
 
         assertTrue(result.isSuccess());
         assertSame(device, result.getData());
+    }
+
+    @Test
+    public void stopRejectsSourceShutdownWhileDeploymentIsRunning() {
+        HDeviceService devices = mock(HDeviceService.class);
+        IDeploymentTaskService deployments = mock(IDeploymentTaskService.class);
+        HDevice device = device("ape-1");
+        DeploymentTask task = new DeploymentTask();
+        task.setDeviceId("ape-1");
+        when(devices.selectDeviceByApeId("ape-1")).thenReturn(device);
+        when(deployments.selectDeploymentTaskList("RUNNING", null, null))
+            .thenReturn(Collections.singletonList(task));
+
+        DeviceMonitorResult result = new DeviceMonitorService(devices, deployments).stop("ape-1");
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getShortMessage().contains("先在布控管理中停止布控"));
+        verify(devices, never()).stopMonitor("ape-1");
     }
 
     @Test

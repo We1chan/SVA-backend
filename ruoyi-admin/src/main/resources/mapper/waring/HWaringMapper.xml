@@ -562,12 +562,14 @@
     </select>
 
     <select id="getOrgRanking" parameterType="HWaring" resultType="map">
-        SELECT count(*) as num, team AS dept_name
+        SELECT count(*) as num,
+               COALESCE(NULLIF(TRIM(team), ''), NULLIF(TRIM(org_name), ''), '未分组') AS dept_name
         FROM h_waring
           where UNIX_TIMESTAMP(h_waring.alarm_time) &gt;= #{begin}
           AND UNIX_TIMESTAMP(h_waring.alarm_time) &lt;= #{end}
           AND is_enable = 1
-        GROUP BY team
+        GROUP BY COALESCE(NULLIF(TRIM(team), ''), NULLIF(TRIM(org_name), ''), '未分组')
+        ORDER BY num DESC
     </select>
 
     <select id="getLevelRanking" parameterType="HWaring" resultType="map">

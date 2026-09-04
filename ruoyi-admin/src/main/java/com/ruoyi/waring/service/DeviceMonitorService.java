@@ -1,6 +1,8 @@
 package com.ruoyi.waring.service;
 
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.DeploymentTask;
+import com.ruoyi.system.service.IDeploymentTaskService;
 import com.ruoyi.waring.domain.DeviceMonitorResult;
 import com.ruoyi.waring.domain.HDevice;
 import org.slf4j.Logger;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
+import java.util.List;
 
 /**
  * 设备监控启停的统一编排服务。
@@ -23,10 +26,18 @@ public class DeviceMonitorService {
     private static final Logger log = LoggerFactory.getLogger(DeviceMonitorService.class);
 
     private final HDeviceService hDeviceService;
+    private final IDeploymentTaskService deploymentTaskService;
 
     @Autowired
-    public DeviceMonitorService(HDeviceService hDeviceService) {
+    public DeviceMonitorService(HDeviceService hDeviceService,
+                                IDeploymentTaskService deploymentTaskService) {
         this.hDeviceService = hDeviceService;
+        this.deploymentTaskService = deploymentTaskService;
+    }
+
+    /** Test/support constructor for callers that do not need deployment guards. */
+    public DeviceMonitorService(HDeviceService hDeviceService) {
+        this(hDeviceService, null);
     }
 
     /** 启动设备实时监控。 */
@@ -45,6 +56,15 @@ public class DeviceMonitorService {
             return DeviceMonitorResult.fail("设备不存在", null);
         }
 
+        if (!start) {
+            int runningDeployments = countRunningDeployments(apeId);
+            if (runningDeployments > 0) {
+                return DeviceMonitorResult.fail(
+                    "该视频源仍有" + runningDeployments + "个运行中的布控，请先在布控管理中停止布控",
+                    snapshot);
+            }
+        }
+
         try {
             int rows = start ? hDeviceService.startMonitor(apeId) : hDeviceService.stopMonitor(apeId);
             if (rows <= 0) {
@@ -57,6 +77,23 @@ public class DeviceMonitorService {
             HDevice latest = safeRead(apeId, snapshot);
             return DeviceMonitorResult.fail(resolveMessage(action, ex), latest);
         }
+    }
+
+    private int countRunningDeployments(String apeId) {
+        if (deploymentTaskService == null || StringUtils.isBlank(apeId)) {
+            return 0;
+        }
+        List<DeploymentTask> tasks = deploymentTaskService.selectDeploymentTaskList("RUNNING", null, null);
+        if (tasks == null || tasks.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (DeploymentTask task : tasks) {
+            if (task != null && apeId.equals(task.getDeviceId())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**

@@ -230,7 +230,10 @@ public class Gb28181SyncServiceImpl implements Gb28181SyncService {
         }
         JsonNode list = page.path("list");
         if (!list.isArray()) {
-            throw new ServiceException("WVP 目录响应缺少 list");
+            // A missing list is not an authoritative empty directory. Treating it
+            // as [] would mark every known GB device offline on a malformed WVP
+            // response, so fail before the transaction writes any state.
+            throw new ServiceException("WVP 目录响应缺少有效 list");
         }
 
         List<JsonNode> items = new ArrayList<>();

@@ -95,11 +95,12 @@ public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
 
     private JsonNode unwrap(JsonNode response, String action) {
         JsonNode current = response;
+        boolean envelopeSeen = false;
         // WVP 不同版本可能返回一层或多层 {code, data} 包装，限制三层避免异常响应无限下钻。
         for (int level = 0; level < 3; level++) {
             if (!current.has("code")) {
-                if (level == 0) {
-                    throw new ServiceException(action + "失败: WVP 响应格式无效");
+                if (!envelopeSeen) {
+                    throw new ServiceException(action + "失败: WVP 返回无法识别的响应");
                 }
                 return current;
             }
@@ -113,6 +114,7 @@ public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
             if (data == null || data.isNull()) {
                 return current;
             }
+            envelopeSeen = true;
             current = data;
         }
         return current;

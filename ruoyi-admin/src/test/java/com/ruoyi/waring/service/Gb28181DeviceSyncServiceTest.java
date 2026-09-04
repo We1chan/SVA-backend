@@ -181,6 +181,7 @@ public class Gb28181DeviceSyncServiceTest {
         assertEquals("2", devices.offlineUpdates.get(0)[3]);
         assertEquals(0, catalog.catalogUpserts);
         assertEquals(1, catalog.catalogOfflineUpdates);
+        assertEquals(false, catalog.selectChannelsByZlmServerId(1L).get(0).isCatalogOnline());
     }
 
     @Test
