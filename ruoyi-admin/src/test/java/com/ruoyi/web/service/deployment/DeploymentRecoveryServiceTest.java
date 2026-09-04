@@ -86,6 +86,7 @@ class DeploymentRecoveryServiceTest
         service.restoreRunningDeployments();
 
         verify(deviceService).startMonitor("device-gb");
+        verify(analyzerClient).cancelControl(task);
         verify(analyzerClient, org.mockito.Mockito.times(2)).ensureControl(task);
     }
 
@@ -105,6 +106,32 @@ class DeploymentRecoveryServiceTest
         service.restoreRunningDeployments();
 
         verify(deviceService).startMonitor("device-stopped");
+        verify(analyzerClient).cancelControl(task);
+        verify(analyzerClient).ensureControl(task);
+    }
+
+    @Test
+    void recreatesAnalyzerControlWhenGbSessionIdWasCleared()
+    {
+        DeploymentTask task = task("control-stale-gb", "device-stale-gb");
+        HDevice device = runningDevice("device-stale-gb");
+        device.setStream_source_type("GB28181");
+        device.setGb_stream_url("rtsp://127.0.0.1:9997/rtp/old");
+        device.setPlay_url("ws://127.0.0.1:9996/rtp/old.live.flv");
+        device.setGb_stream_id(null);
+        when(taskService.selectDeploymentTaskList("RUNNING", null, null))
+            .thenReturn(Arrays.asList(task));
+        when(deviceService.selectDeviceByApeId("device-stale-gb")).thenReturn(device);
+        when(deviceService.startMonitor("device-stale-gb")).thenReturn(1);
+        when(analyzerClient.cancelControl(task))
+            .thenReturn(DeploymentAnalyzerClient.AnalyzerResult.ok("cancelled"));
+        when(analyzerClient.ensureControl(task))
+            .thenReturn(DeploymentAnalyzerClient.AnalyzerResult.ok("restored"));
+
+        service.restoreRunningDeployments();
+
+        verify(deviceService).startMonitor("device-stale-gb");
+        verify(analyzerClient).cancelControl(task);
         verify(analyzerClient).ensureControl(task);
     }
 

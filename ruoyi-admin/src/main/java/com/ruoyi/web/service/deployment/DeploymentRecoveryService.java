@@ -1,6 +1,7 @@
 package com.ruoyi.web.service.deployment;
 
 import java.util.List;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.DeploymentTask;
 import com.ruoyi.system.service.IDeploymentTaskService;
 import com.ruoyi.waring.domain.HDevice;
@@ -52,11 +53,16 @@ public class DeploymentRecoveryService
                         task.getDeploymentId(), task.getDeviceId());
                     continue;
                 }
-                if (!"RUNNING".equalsIgnoreCase(device.getMonitor_status()))
+                boolean sourceRestarted = !"RUNNING".equalsIgnoreCase(device.getMonitor_status())
+                    || requiresGbPlaybackRestart(device);
+                if (sourceRestarted)
                 {
-                    log.info("运行中布控的视频源未启动，自动恢复, deploymentId={}, deviceId={}, monitorStatus={}",
+                    log.info("运行中布控的视频源会话失效，自动恢复, deploymentId={}, deviceId={}, monitorStatus={}",
                         task.getDeploymentId(), task.getDeviceId(), device.getMonitor_status());
                     hDeviceService.startMonitor(task.getDeviceId());
+                    // The analyzer may still retain a control whose reader exited with the
+                    // old GB URL. Recreate it instead of accepting "already running".
+                    deploymentAnalyzerClient.cancelControl(task);
                 }
 
                 DeploymentAnalyzerClient.AnalyzerResult result = deploymentAnalyzerClient.ensureControl(task);
@@ -65,6 +71,7 @@ public class DeploymentRecoveryService
                     // GB28181 disconnects invalidate the old WVP playback URL. Re-INVITE
                     // the channel once it is online again, then rebuild the analyzer control.
                     hDeviceService.startMonitor(task.getDeviceId());
+                    deploymentAnalyzerClient.cancelControl(task);
                     result = deploymentAnalyzerClient.ensureControl(task);
                 }
                 if (result.isSuccess())
@@ -83,6 +90,14 @@ public class DeploymentRecoveryService
                 log.warn("布控自动恢复异常, deploymentId={}", task.getDeploymentId(), ex);
             }
         }
+    }
+
+    private boolean requiresGbPlaybackRestart(HDevice device)
+    {
+        return "GB28181".equalsIgnoreCase(device.getStream_source_type())
+            && (StringUtils.isBlank(device.getGb_stream_id())
+                || StringUtils.isBlank(device.getGb_stream_url())
+                || StringUtils.isBlank(device.getPlay_url()));
     }
 
     private boolean isMediaRecoveryFailure(DeploymentAnalyzerClient.AnalyzerResult result)
