@@ -775,7 +775,8 @@ public class DeploymentAnalyzerClient
         {
             return null;
         }
-        return "ws://" + config.zlmHost + ":" + config.zlmMediaHttpPort + "/" + config.svaApp + "/"
+        // 浏览器播放算法输出流（带画框）走 HTTP-FLV，flv.js 不支持 ws 协议。
+        return "http://" + config.zlmHost + ":" + config.zlmMediaHttpPort + "/" + config.svaApp + "/"
             + deploymentId + ".live.flv";
     }
 

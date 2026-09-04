@@ -299,11 +299,11 @@ public class HDeviceServiceImpl implements HDeviceService {
         Map<String, Object> result = new HashMap<>();
         result.put("apeId", apeId);
         result.put("stream", stream);
-        result.put("playUrl", "ws://" + zlmServer.getHost() + ":" + zlmServer.getMedia_http_port() + "/" + zlmApp + "/" + stream + ".live.flv");
+        result.put("playUrl", "http://" + zlmServer.getHost() + ":" + zlmServer.getMedia_http_port() + "/" + zlmApp + "/" + stream + ".live.flv");
         result.put("zlmProxyKey", StringUtils.isBlank(zlmProxyKey) ? null : zlmProxyKey);
         result.put("addProxySuccess", addProxySuccess);
         result.put("addProxyAlreadyExists", addProxyAlreadyExists);
-        result.put("protocol", "ws-flv");
+        result.put("protocol", "http-flv");
         return result;
     }
 
@@ -867,7 +867,9 @@ public class HDeviceServiceImpl implements HDeviceService {
 
         String zlmApp = StringUtils.isBlank(zlmServer.getApp()) ? DEFAULT_ZLM_APP : zlmServer.getApp().trim();
         String stream = sanitizeStreamName(device.getApe_id());
-        return "ws://" + zlmServer.getHost() + ":" + zlmServer.getMedia_http_port() + "/" + zlmApp + "/" + stream + ".live.flv";
+        // ZLM media_http_port 提供的是 HTTP-FLV，浏览器通过 flv.js 拉流必须用 http(s) 协议，
+        // 不能使用 ws://（否则 flv.js 会走 WebSocket loader，而该端口不支持 WebSocket）。
+        return "http://" + zlmServer.getHost() + ":" + zlmServer.getMedia_http_port() + "/" + zlmApp + "/" + stream + ".live.flv";
     }
 
     private ZlmServer resolveEnabledZlmServer(HDevice device) {
