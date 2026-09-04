@@ -5,8 +5,10 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.waring.domain.Gb28181Channel;
+import com.ruoyi.waring.domain.Gb28181PtzCommand;
 import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.service.DeviceMonitorService;
+import com.ruoyi.waring.service.Gb28181PtzService;
 import com.ruoyi.waring.service.Gb28181SyncService;
 import com.ruoyi.waring.service.HDeviceService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +48,9 @@ public class HDeviceController extends BaseController {
 
     @Autowired
     private Gb28181SyncService gb28181SyncService;
+
+    @Autowired
+    Gb28181PtzService gb28181PtzService;
 
     @Resource
     private RedisTemplate<Object, Object> redisTemplate;
@@ -160,6 +165,16 @@ public class HDeviceController extends BaseController {
     @GetMapping("/monitor/{apeId}/preview")
     public AjaxResult previewMonitor(@PathVariable String apeId) {
         return success(hDeviceService.previewMonitor(apeId));
+    }
+
+    /**
+     * 下发 GB28181 云台控制指令。移动指令由服务端自动补发安全停止。
+     */
+    @PreAuthorize("@ss.hasPermi('waring:device:start')")
+    @PostMapping("/monitor/{apeId}/ptz")
+    public AjaxResult controlPtz(@PathVariable String apeId,
+                                 @RequestBody Gb28181PtzCommand command) {
+        return success(gb28181PtzService.control(apeId, command));
     }
 
     /**
