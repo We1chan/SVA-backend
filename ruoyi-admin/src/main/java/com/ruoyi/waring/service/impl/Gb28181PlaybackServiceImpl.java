@@ -58,6 +58,7 @@ public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
                 text(data, "ws_fmp4"), text(data, "fmp4"), text(data, "hls"));
         String rtspUrl = text(data, "rtsp");
         if (StringUtils.isBlank(streamId) || StringUtils.isBlank(playUrl) || StringUtils.isBlank(rtspUrl)) {
+            cleanupIncompletePlayback(deviceId, channelId);
             throw new ServiceException("WVP 点播成功但返回的播放地址不完整");
         }
 
@@ -97,6 +98,9 @@ public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
         // WVP 不同版本可能返回一层或多层 {code, data} 包装，限制三层避免异常响应无限下钻。
         for (int level = 0; level < 3; level++) {
             if (!current.has("code")) {
+                if (level == 0) {
+                    throw new ServiceException(action + "失败: WVP 响应格式无效");
+                }
                 return current;
             }
 
@@ -112,6 +116,14 @@ public class Gb28181PlaybackServiceImpl implements Gb28181PlaybackService {
             current = data;
         }
         return current;
+    }
+
+    private void cleanupIncompletePlayback(String deviceId, String channelId) {
+        try {
+            request(buildUri("stop", deviceId, channelId), "回收不完整国标点播");
+        } catch (ServiceException ignored) {
+            // 原始 start 响应缺失播放地址才是调用方需要处理的主错误；清理失败不覆盖它。
+        }
     }
 
     private String extractErrorMessage(String body) {

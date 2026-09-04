@@ -22,7 +22,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -225,15 +224,21 @@ public class Gb28181SyncServiceImpl implements Gb28181SyncService {
             }
         }
 
-        JsonNode page = response.has("data") ? response.path("data") : response;
+        JsonNode page = response.has("data") ? response.get("data") : response;
+        if (page == null || !page.isObject()) {
+            throw new ServiceException("WVP 目录响应缺少有效 data");
+        }
         JsonNode list = page.path("list");
         if (!list.isArray()) {
-            return new PageData(Collections.emptyList(), 0);
+            throw new ServiceException("WVP 目录响应缺少 list");
         }
 
         List<JsonNode> items = new ArrayList<>();
         list.forEach(items::add);
-        int pages = page.path("pages").asInt(items.isEmpty() ? 0 : 1);
+        Integer pages = integer(page, "pages");
+        if (pages == null || pages < 0) {
+            throw new ServiceException("WVP 目录响应缺少有效 pages");
+        }
         return new PageData(items, pages);
     }
 

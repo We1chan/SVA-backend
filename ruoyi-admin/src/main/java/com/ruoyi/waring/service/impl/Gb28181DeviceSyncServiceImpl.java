@@ -15,6 +15,7 @@ import com.ruoyi.waring.service.Gb28181DeviceSyncService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -60,6 +61,7 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DeviceSyncResult syncDevices(Long zlmServerId, List<Gb28181Channel> channels) {
         if (zlmServerId == null) {
             throw new ServiceException("zlmServerId 不能为空");
@@ -88,13 +90,12 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
 
         List<Gb28181Channel> cataloged = catalogMapper.selectChannelsByZlmServerId(zlmServerId);
         Set<String> incomingKeys = incoming.stream().map(this::identityKey).collect(Collectors.toSet());
-        Set<String> existingKeys = cataloged.stream()
-            .map(this::identityKey)
-            .collect(Collectors.toCollection(HashSet::new));
-
         DeviceSyncResult result = new DeviceSyncResult();
         for (Gb28181Channel existing : cataloged) {
             if (!incomingKeys.contains(identityKey(existing))) {
+                catalogMapper.markCatalogChannelOffline(
+                    zlmServerId, existing.getDeviceId(), existing.getChannelId());
+                existing.setCatalogOnline(false);
                 int rows = hDeviceMapper.updateGbDeviceOnlineByChannel(
                     zlmServerId, existing.getDeviceId(), existing.getChannelId(), OFFLINE);
                 result.addOfflineMarked(rows);
@@ -102,9 +103,13 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
         }
 
         for (Gb28181Channel channel : incoming) {
-            catalogMapper.upsertCatalogChannel(channel);
             HDevice existed = hDeviceMapper.selectGbDevice(
                 zlmServerId, channel.getDeviceId(), channel.getChannelId());
+            if (isWvpOwnedMirror(existed)) {
+                throw new ServiceException("目录通道已由 WVP 同步维护，拒绝旧目录覆盖: "
+                    + channel.getChannelId());
+            }
+            catalogMapper.upsertCatalogChannel(channel);
             HDevice mirror = new HDevice();
             mirror.setApe_id(existed == null
                 ? buildApeId(channel.getDeviceId(), channel.getChannelId())
@@ -117,7 +122,7 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
             mirror.setGb_channel_id(channel.getChannelId());
             mirror.setPlay_url(channel.getPlayUrl());
             mirror.setZlm_server_id(zlmServerId);
-            mirror.setIs_online(ONLINE);
+            mirror.setIs_online(channel.isCatalogOnline() ? ONLINE : OFFLINE);
             mirror.setMonitor_status(existed == null ? "STOPPED" : existed.getMonitor_status());
             mirror.setSync_source("GB28181目录");
             hDeviceMapper.upsertGbDevice(mirror);
@@ -150,9 +155,10 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
                 result.incrementUnavailable();
             }
             if (hDeviceMapper != null) {
+                String online = available && channel.isCatalogOnline() ? ONLINE : OFFLINE;
                 hDeviceMapper.updateGbDeviceOnlineByChannel(
                     zlmServerId, channel.getDeviceId(), channel.getChannelId(),
-                    available ? ONLINE : OFFLINE);
+                    online);
             }
         }
         return result;
@@ -225,6 +231,10 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
 
     private String identityKey(Gb28181Channel channel) {
         return channel.getDeviceId() + "\u0000" + channel.getChannelId();
+    }
+
+    private boolean isWvpOwnedMirror(HDevice device) {
+        return device != null && GB_DEVICE_TYPE.equalsIgnoreCase(device.getStream_source_type());
     }
 
     private String buildApeId(String deviceId, String channelId) {
