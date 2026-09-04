@@ -80,14 +80,25 @@ class HDeviceServiceImplTest {
     @Test
     void returnsActiveGb28181PreviewUrl() {
         HDevice device = gbDevice("1");
-        device.setPlay_url("ws://10.0.0.2:9996/rtp/stream-1.live.flv");
+        device.setPlay_url("ws://127.0.0.1:9996/rtp/stream-1.live.flv?token=1");
         device.setGb_stream_url("rtsp://10.0.0.2:9997/rtp/stream-1");
         when(mapper.selectDeviceByApeId("GB_TEST")).thenReturn(device);
 
         Map<String, Object> preview = service.previewMonitor("GB_TEST");
 
-        assertEquals(device.getPlay_url(), preview.get("playUrl"));
+        assertEquals("/gb-media/rtp/stream-1.live.flv?token=1", preview.get("playUrl"));
         assertEquals(device.getGb_stream_url(), preview.get("streamUrl"));
+    }
+
+    @Test
+    void preservesRemoteGb28181PreviewUrl() {
+        HDevice device = gbDevice("1");
+        device.setPlay_url("ws://media.example:9996/rtp/stream-1.live.flv");
+        when(mapper.selectDeviceByApeId("GB_TEST")).thenReturn(device);
+
+        Map<String, Object> preview = service.previewMonitor("GB_TEST");
+
+        assertEquals(device.getPlay_url(), preview.get("playUrl"));
     }
 
     @Test

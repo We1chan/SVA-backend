@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import jakarta.annotation.PostConstruct;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,8 @@ public class HDeviceServiceImpl implements HDeviceService {
     private static final String MONITOR_STATUS_ERROR = "ERROR";
     private static final long DEFAULT_SERVER_ID = 1L;
     private static final String DEFAULT_ZLM_APP = "live";
+    private static final int DEFAULT_GB_MEDIA_HTTP_PORT = 9996;
+    private static final String GB_MEDIA_PROXY_PREFIX = "/gb-media";
 
     @Autowired
     HDeviceMapper hDeviceMapper;
@@ -671,7 +674,11 @@ public class HDeviceServiceImpl implements HDeviceService {
         result.put("streamSourceType", device.getStream_source_type());
         result.put("monitorStatus", device.getMonitor_status());
         result.put("directSourceUrl", device.getDirect_source_url());
-        result.put("playUrl", previewPlayUrl);
+        // The persisted WVP URL is also consumed by the analyzer and therefore
+        // keeps its internal host/port. The preview API, however, must return a
+        // browser-reachable URL. For the bundled loopback GB ZLM, route HTTP-FLV
+        // through nginx so old and new frontend bundles both avoid 127.0.0.1:9996.
+        result.put("playUrl", buildBrowserPreviewPlayUrl(device, previewPlayUrl));
         result.put("rtspUrl", device.getGb_stream_url());
         result.put("streamUrl", device.getGb_stream_url());
         result.put("gbDeviceId", device.getGb_device_id());
@@ -692,6 +699,48 @@ public class HDeviceServiceImpl implements HDeviceService {
 
     private boolean isDirectDevice(HDevice device) {
         return device != null && STREAM_SOURCE_TYPE_DIRECT.equalsIgnoreCase(device.getStream_source_type());
+    }
+
+    private String buildBrowserPreviewPlayUrl(HDevice device, String playUrl) {
+        if (device == null || StringUtils.isBlank(playUrl)
+                || (!isCatalogGb28181Device(device) && !isWvpGb28181Device(device))) {
+            return playUrl;
+        }
+
+        String trimmed = playUrl.trim();
+        if (trimmed.startsWith(GB_MEDIA_PROXY_PREFIX + "/")) {
+            return trimmed;
+        }
+
+        try {
+            URI uri = URI.create(trimmed);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            boolean supportedScheme = "ws".equalsIgnoreCase(scheme)
+                    || "wss".equalsIgnoreCase(scheme)
+                    || "http".equalsIgnoreCase(scheme)
+                    || "https".equalsIgnoreCase(scheme);
+            boolean loopback = "127.0.0.1".equals(host)
+                    || "localhost".equalsIgnoreCase(host)
+                    || "::1".equals(host);
+            String path = uri.getRawPath();
+            if (!supportedScheme || !loopback || uri.getPort() != DEFAULT_GB_MEDIA_HTTP_PORT
+                    || StringUtils.isBlank(path) || !path.toLowerCase().endsWith(".flv")) {
+                return trimmed;
+            }
+
+            StringBuilder browserUrl = new StringBuilder(GB_MEDIA_PROXY_PREFIX).append(path);
+            if (StringUtils.isNotBlank(uri.getRawQuery())) {
+                browserUrl.append('?').append(uri.getRawQuery());
+            }
+            if (StringUtils.isNotBlank(uri.getRawFragment())) {
+                browserUrl.append('#').append(uri.getRawFragment());
+            }
+            return browserUrl.toString();
+        } catch (IllegalArgumentException ex) {
+            log.warn("国标预览地址格式无效，保持原值: {}", trimmed);
+            return trimmed;
+        }
     }
 
     /** WVP 点播路线：stream_source_type='GB28181'，通过 WVP INVITE 产生点播流。 */
