@@ -31,7 +31,9 @@ import com.ruoyi.system.domain.DeploymentTaskEvent;
 import com.ruoyi.system.mapper.DeploymentTaskEventMapper;
 import com.ruoyi.system.service.IDeploymentTaskService;
 import com.ruoyi.web.service.deployment.DeploymentAnalyzerClient;
+import com.ruoyi.waring.domain.HDevice;
 import com.ruoyi.waring.service.HAlgorithmService;
+import com.ruoyi.waring.service.HDeviceService;
 
 @RestController
 @RequestMapping("/deployments")
@@ -66,6 +68,9 @@ public class DeploymentController
 
     @Autowired
     private HAlgorithmService hAlgorithmService;
+
+    @Autowired
+    private HDeviceService hDeviceService;
 
     @PostMapping
     public AjaxResult create(@RequestBody CreateDeploymentRequest request)
@@ -284,6 +289,28 @@ public class DeploymentController
         if (StringUtils.isEmpty(recognitionRegion))
         {
             return buildActionResult(false, "启动", "geometryConfig主区域格式不正确", "geometryConfig主区域格式不正确", record);
+        }
+
+        try
+        {
+            HDevice device = hDeviceService.selectDeviceByApeId(record.getDeviceId());
+            if (device == null)
+            {
+                return buildActionResult(false, "启动", "绑定设备不存在", "绑定设备不存在", record);
+            }
+            if (!"1".equals(device.getIs_online()))
+            {
+                return buildActionResult(false, "启动", "绑定设备当前离线", "绑定设备当前离线", record);
+            }
+            if (!"RUNNING".equalsIgnoreCase(device.getMonitor_status()))
+            {
+                hDeviceService.startMonitor(record.getDeviceId());
+            }
+        }
+        catch (Exception ex)
+        {
+            String message = StringUtils.defaultIfEmpty(ex.getMessage(), "启动视频源失败");
+            return buildActionResult(false, "启动", message, message, record);
         }
 
         DeploymentAnalyzerClient.AnalyzerResult analyzerResult =

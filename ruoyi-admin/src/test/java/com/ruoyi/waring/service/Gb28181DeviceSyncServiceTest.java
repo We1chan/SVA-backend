@@ -178,7 +178,8 @@ public class Gb28181DeviceSyncServiceTest {
         assertEquals(1, devices.offlineUpdates.size());
         assertEquals("34020000001310000001", devices.offlineUpdates.get(0)[2]);
         assertEquals("2", devices.offlineUpdates.get(0)[3]);
-        assertEquals(0, catalog.catalogUpserts);
+        assertEquals(1, catalog.catalogUpserts);
+        assertEquals(false, catalog.cataloged.isCatalogOnline());
     }
 
     @Test

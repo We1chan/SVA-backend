@@ -84,6 +84,11 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
             if (!zlmServerId.equals(channel.getZlmServerId())) {
                 throw new ServiceException("目录通道 zlmServerId 与请求不一致: " + channel.getChannelId());
             }
+            HDevice owner = hDeviceMapper.selectGbDevice(
+                zlmServerId, channel.getDeviceId(), channel.getChannelId());
+            if (owner != null && "GB28181".equalsIgnoreCase(owner.getStream_source_type())) {
+                throw new ServiceException("该国标通道已由 WVP 同步管理，禁止旧目录覆盖: " + channel.getChannelId());
+            }
         }
 
         List<Gb28181Channel> cataloged = catalogMapper.selectChannelsByZlmServerId(zlmServerId);
@@ -95,6 +100,11 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
         DeviceSyncResult result = new DeviceSyncResult();
         for (Gb28181Channel existing : cataloged) {
             if (!incomingKeys.contains(identityKey(existing))) {
+                // Persist the authoritative catalog-offline state as well as the
+                // h_device mirror. Otherwise a stale ZLM stream can promote this
+                // removed channel back online during the next media refresh.
+                existing.setCatalogOnline(false);
+                catalogMapper.upsertCatalogChannel(existing);
                 int rows = hDeviceMapper.updateGbDeviceOnlineByChannel(
                     zlmServerId, existing.getDeviceId(), existing.getChannelId(), OFFLINE);
                 result.addOfflineMarked(rows);
@@ -117,7 +127,7 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
             mirror.setGb_channel_id(channel.getChannelId());
             mirror.setPlay_url(channel.getPlayUrl());
             mirror.setZlm_server_id(zlmServerId);
-            mirror.setIs_online(ONLINE);
+            mirror.setIs_online(channel.isCatalogOnline() ? ONLINE : OFFLINE);
             mirror.setMonitor_status(existed == null ? "STOPPED" : existed.getMonitor_status());
             mirror.setSync_source("GB28181目录");
             hDeviceMapper.upsertGbDevice(mirror);
@@ -142,7 +152,9 @@ public class Gb28181DeviceSyncServiceImpl implements Gb28181DeviceSyncService {
 
         MediaRefreshResult result = new MediaRefreshResult();
         for (Gb28181Channel channel : catalogMapper.selectChannelsByZlmServerId(zlmServerId)) {
-            boolean available = activeBindings.contains(bindingKey(channel));
+            // Catalog presence is authoritative. A stale media stream alone must
+            // never resurrect a device that has unregistered or was dropped.
+            boolean available = channel.isCatalogOnline() && activeBindings.contains(bindingKey(channel));
             catalogMapper.updateMediaAvailability(channel.getId(), available);
             if (available) {
                 result.incrementAvailable();

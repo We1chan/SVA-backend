@@ -529,9 +529,6 @@ public class HDeviceServiceImpl implements HDeviceService {
         } else if (isDirectDevice(existedDevice)) {
             Map<String, Object> directLiveInfo = getDirectLiveUrl(apeId);
             boolean addProxyAlreadyExists = Boolean.TRUE.equals(directLiveInfo.get("addProxyAlreadyExists"));
-            if (addProxyAlreadyExists) {
-                throw new ServiceException("设备监控已经启动过");
-            }
 
             Object playUrlObj = directLiveInfo.get("playUrl");
             Object zlmProxyKeyObj = directLiveInfo.get("zlmProxyKey");
@@ -542,6 +539,9 @@ public class HDeviceServiceImpl implements HDeviceService {
             hDeviceMapper.updatePlayUrlByApeId(apeId, startPlayUrl);
             if (StringUtils.isNotBlank(zlmProxyKey)) {
                 hDeviceMapper.updateZlmProxyKeyByApeId(apeId, zlmProxyKey);
+            }
+            if (addProxyAlreadyExists) {
+                log.debug("DIRECT 视频代理已存在，按幂等启动处理, apeId={}", apeId);
             }
         }
 
