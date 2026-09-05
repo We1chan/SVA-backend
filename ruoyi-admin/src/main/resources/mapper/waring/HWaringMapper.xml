@@ -853,11 +853,11 @@
     </select>
 
     <select id="getWaring">
-        SELECT alarm_type_name, device_name, alarm_time, picture_absolute_url FROM h_waring  WHERE is_enable = 1 AND is_handle = 0  ORDER BY alarm_time DESC LIMIT 7
+        SELECT alarm_type_name, device_name, alarm_time, picture_absolute_url FROM h_waring WHERE is_enable = 1 AND is_handle = 0 ORDER BY alarm_time DESC
     </select>
 
     <select id="getWaringByOrg">
-        SELECT alarm_type_name, device_name, alarm_time, picture_absolute_url FROM h_waring WHERE org_index = #{org_index} AND is_enable = 1 AND is_handle = 0 ORDER BY alarm_time DESC LIMIT 7
+        SELECT alarm_type_name, device_name, alarm_time, picture_absolute_url FROM h_waring WHERE org_index = #{org_index} AND is_enable = 1 AND is_handle = 0 ORDER BY alarm_time DESC
     </select>
 
     <select id="getAlarmPhoto">
